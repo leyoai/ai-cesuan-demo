@@ -1,0 +1,6 @@
+{
+  "name": "天玑测算与后台管理平台",
+  "description": "基于智能多维特征与星盘分析测评小程序及可视化后台管理平台，提供MBTI人格、成长潜能、职场潜能、情感探秘等现代测试功能，支持核心价格配置、AI提示词模板及实时订单转化监控。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
