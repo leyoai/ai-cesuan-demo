@@ -52,6 +52,20 @@ const getOrCreateUser = (req: express.Request, res: express.Response): CurrentUs
   return usersById.get(userId)!;
 };
 
+const seedUser = (user: CurrentUser) => {
+  usersById.set(user.userId, user);
+  if (user.phone) usersByPhone.set(user.phone, user.userId);
+};
+
+seedUser({ userId: "u-10001", userNickname: "星球访客A", phone: "13800138001", createdAt: new Date(Date.now() - 20 * 24 * 3600 * 1000).toISOString() });
+seedUser({ userId: "u-10002", userNickname: "星球访客B", phone: "13800138002", createdAt: new Date(Date.now() - 10 * 24 * 3600 * 1000).toISOString() });
+seedUser({ userId: "u-10003", userNickname: "星球访客C", createdAt: new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString() });
+
+const withOrderPhone = (order: CalculationOrder): CalculationOrder => ({
+  ...order,
+  phone: order.userId ? usersById.get(order.userId)?.phone : undefined
+});
+
 // Initialize Gemini Client
 let ai: GoogleGenAI | null = null;
 try {
@@ -699,7 +713,7 @@ app.get("/api/orders/lookup", (req, res) => {
   } else {
     matched = orders.filter(order => order.userId === user.userId);
   }
-  res.json(matched);
+  res.json(matched.map(withOrderPhone));
 });
 
 // 1. Get calculations configurations
@@ -733,7 +747,7 @@ app.post("/api/tests/reset", (req, res) => {
 
 // 4. Get order log
 app.get("/api/orders", (req, res) => {
-  res.json(orders);
+  res.json(orders.map(withOrderPhone));
 });
 
 // Create a pending (unpaid) order record

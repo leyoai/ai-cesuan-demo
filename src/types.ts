@@ -14,6 +14,7 @@ export interface TestItem {
   detailHeroImage?: string;
   detailSubtitle?: string;
   detailBody?: string;
+  detailDisclaimerText?: string;
   detailButtonText?: string;
   detailThemeColor?: string;
   price: number;
@@ -48,6 +49,7 @@ export interface CalculationOrder {
   testName: string;
   userId?: string;
   userNickname?: string;
+  phone?: string;
   userName: string;
   gender: "male" | "female" | "other";
   birthDate?: string; // YYYY-MM-DD

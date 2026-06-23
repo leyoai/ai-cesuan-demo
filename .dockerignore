@@ -1,0 +1,12 @@
+node_modules/
+.npm-cache/
+.git/
+.gitignore
+.idea/
+.vscode/
+dist/
+.env
+.env.*
+!.env.example
+*.md
+.DS_Store

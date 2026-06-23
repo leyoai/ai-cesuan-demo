@@ -73,6 +73,7 @@ interface QuestionBankItem {
 interface MarketingCampaign {
   id: string;
   name: string;
+  mediaAccountId?: string;
   skuId?: string;
   skuName?: string;
   testId: string;
@@ -84,6 +85,8 @@ interface MarketingCampaign {
   heroImage?: string;
   subtitle?: string;
   detailBody?: string;
+  disclaimerText?: string;
+  advertiserName?: string;
   buttonText?: string;
   buttonStyle?: "solid" | "outline" | "glow";
   themeColor?: string;
@@ -94,6 +97,14 @@ interface MarketingCampaign {
   pays: number;
   adSpend: number;
   reportViews: number;
+}
+
+interface MediaAccount {
+  id: string;
+  name: string;
+  platform: "巨量" | "快手";
+  company: string;
+  createdAt: string;
 }
 
 interface ReportTemplate {
@@ -112,12 +123,18 @@ type MenuKey =
   | "orders"
   | "prompts";
 
-type MarketingTab = "landing" | "data";
+type MarketingTab = "landing" | "data" | "accounts";
 
 const REPORT_TEMPLATE_STORAGE_KEY = "admin_report_templates_v1";
 const REPORT_TEMPLATE_DISABLED_STORAGE_KEY = "admin_report_template_disabled_v1";
 
 const getMediaPlatformKey = (platform: string) => (platform === "快手" ? "kuaishou" : "juliang");
+
+const defaultMediaAccounts: MediaAccount[] = [
+  { id: "jl-jl1000", name: "巨量投放账号-1000", platform: "巨量", company: "上海星盘文化科技有限公司", createdAt: "2026-06-01 09:00" },
+  { id: "ks-ks2000", name: "快手投放账号-2000", platform: "快手", company: "杭州灵感互动科技有限公司", createdAt: "2026-06-03 10:30" },
+  { id: "jl-jl1001", name: "巨量投放账号-1001", platform: "巨量", company: "上海星盘文化科技有限公司", createdAt: "2026-06-04 09:00" }
+];
 
 const getOrderStatusLabel = (status: CalculationOrder["status"]) => {
   if (status === "paid") return { label: "已支付", className: "bg-[#1D9E75]/10 text-[#1D9E75] border-[#1D9E75]/35" };
@@ -151,24 +168,42 @@ export default function AdminDashboard({
   const [landingPlatformFilter, setLandingPlatformFilter] = useState<"all" | "巨量" | "快手">("all");
   const [landingSkuFilter, setLandingSkuFilter] = useState("all");
   const [landingCreatedDateFilter, setLandingCreatedDateFilter] = useState("");
+  const [landingMediaAccountIdFilter, setLandingMediaAccountIdFilter] = useState("");
+  const [landingMediaAccountNameFilter, setLandingMediaAccountNameFilter] = useState("");
   const [channelDateFilter, setChannelDateFilter] = useState("");
   const [channelLandingNameFilter, setChannelLandingNameFilter] = useState("");
   const [channelPlatformFilter, setChannelPlatformFilter] = useState<"all" | "巨量" | "快手">("all");
+  const [channelAccountIdFilter, setChannelAccountIdFilter] = useState("");
+  const [channelAccountNameFilter, setChannelAccountNameFilter] = useState("");
   const [channelDeductionFilter, setChannelDeductionFilter] = useState("");
+  const [mediaAccountPlatformFilter, setMediaAccountPlatformFilter] = useState<"all" | "巨量" | "快手">("all");
+  const [mediaAccountKeywordFilter, setMediaAccountKeywordFilter] = useState("");
+  const [mediaAccounts, setMediaAccounts] = useState<MediaAccount[]>(defaultMediaAccounts);
+  const [showMediaAccountModal, setShowMediaAccountModal] = useState(false);
+  const [editingMediaAccountId, setEditingMediaAccountId] = useState<string | null>(null);
+  const [mediaAccountIdInput, setMediaAccountIdInput] = useState("");
+  const [mediaAccountNameInput, setMediaAccountNameInput] = useState("");
+  const [mediaAccountPlatformInput, setMediaAccountPlatformInput] = useState<"巨量" | "快手">("巨量");
+  const [mediaAccountCompanyInput, setMediaAccountCompanyInput] = useState("");
   const [copiedCampId, setCopiedCampId] = useState<string | null>(null);
   const [openFormulaKey, setOpenFormulaKey] = useState<string | null>(null);
   const [showLandingModal, setShowLandingModal] = useState(false);
   const [editingLandingId, setEditingLandingId] = useState<string | null>(null);
   const [landingFormName, setLandingFormName] = useState("");
   const [landingFormPlatform, setLandingFormPlatform] = useState<"巨量" | "快手">("巨量");
+  const [landingFormMediaAccountId, setLandingFormMediaAccountId] = useState("");
   const [landingFormDeduction, setLandingFormDeduction] = useState("100");
   const [landingFormSkuId, setLandingFormSkuId] = useState("");
   const [landingFormHeroImage, setLandingFormHeroImage] = useState("");
   const [landingFormDetailBody, setLandingFormDetailBody] = useState("");
+  const [landingFormDisclaimerText, setLandingFormDisclaimerText] = useState("测试结果仅供娱乐和参考！\n本测试为付费测试，付费后可查看测试结果。");
+  const [landingFormAdvertiserName, setLandingFormAdvertiserName] = useState("广州学诚网络科技有限公司");
   const [landingFormButtonText, setLandingFormButtonText] = useState("马上测试");
   const [landingFormButtonStyle, setLandingFormButtonStyle] = useState<"solid" | "outline" | "glow">("solid");
   const [landingFormThemeColor, setLandingFormThemeColor] = useState("#1D9E75");
   const [orderDateFilter, setOrderDateFilter] = useState("");
+  const [orderNoFilter, setOrderNoFilter] = useState("");
+  const [orderPhoneFilter, setOrderPhoneFilter] = useState("");
   const [orderStatusFilter, setOrderStatusFilter] = useState<"all" | "paid" | "refunded" | "pending">("all");
   const [orderPaymentMethodFilter, setOrderPaymentMethodFilter] = useState<"all" | "wechat" | "alipay">("all");
   const orderDateInputRef = useRef<HTMLInputElement>(null);
@@ -224,6 +259,7 @@ export default function AdminDashboard({
   const [itemDescription, setItemDescription] = useState("");
   const [itemHeroImage, setItemHeroImage] = useState("");
   const [itemDetailBody, setItemDetailBody] = useState("");
+  const [itemDisclaimerText, setItemDisclaimerText] = useState("测试结果仅供娱乐和参考！\n本测试为付费测试，付费后可查看测试结果。");
   const [itemButtonText, setItemButtonText] = useState("马上测试");
   const [itemThemeColor, setItemThemeColor] = useState("#f59e0b");
   const [itemPromptRefId, setItemPromptRefId] = useState("");
@@ -1005,6 +1041,7 @@ export default function AdminDashboard({
     setItemDescription("");
     setItemHeroImage("");
     setItemDetailBody("");
+    setItemDisclaimerText("测试结果仅供娱乐和参考！\n本测试为付费测试，付费后可查看测试结果。");
     setItemButtonText("马上测试");
     setItemThemeColor("#f59e0b");
     setItemPromptRefId(promptTemplates[0]?.id || "");
@@ -1031,6 +1068,7 @@ export default function AdminDashboard({
     setItemDescription(test.description);
     setItemHeroImage(test.detailHeroImage || "");
     setItemDetailBody(test.detailBody || "");
+    setItemDisclaimerText(test.detailDisclaimerText || "测试结果仅供娱乐和参考！\n本测试为付费测试，付费后可查看测试结果。");
     setItemButtonText(test.detailButtonText || "马上测试");
     setItemThemeColor(test.detailThemeColor || "#f59e0b");
     setItemPromptRefId(test.promptTemplateId || `tpl-${test.id}`);
@@ -1055,6 +1093,10 @@ export default function AdminDashboard({
       showAdminAlert("资料推演型内容模板需至少选择1个前置资料字段。");
       return;
     }
+    if (!itemDisclaimerText.trim()) {
+      showAdminAlert("请输入免责声明。");
+      return;
+    }
     const existing = tests.find((test) => test.id === editingItemId);
     const safeId = editingItemId || generateEightDigitId(tests.map((test) => test.id));
     const referencedPrompt = promptTemplates.find((template) => template.id === itemPromptRefId);
@@ -1069,6 +1111,7 @@ export default function AdminDashboard({
       description: itemDescription.trim() || existing?.description || "后台新增测算商品。",
       detailHeroImage: itemHeroImage.trim(),
       detailBody: itemDetailBody.trim(),
+      detailDisclaimerText: itemDisclaimerText.trim() || "测试结果仅供娱乐和参考！\n本测试为付费测试，付费后可查看测试结果。",
       detailButtonText: itemButtonText.trim() || "马上测试",
       detailThemeColor: itemThemeColor,
       price: Number(itemPrice) || existing?.price || 19.9,
@@ -1643,6 +1686,7 @@ export default function AdminDashboard({
     {
       id: "JL1000",
       name: "抖音星盘双人配对高热转化渠道",
+      mediaAccountId: "jl-jl1000",
       skuId: "sku-relationship-attachment-standard",
       skuName: "亲密关系：成人依恋类型与恋爱盲区测试 标准售卖SKU",
       testId: "relationship-attachment",
@@ -1650,9 +1694,11 @@ export default function AdminDashboard({
       platform: "巨量",
       price: 29.9,
       deductionPercent: 100,
-      linkUrl: `${window.location.origin}/?media=juliang&channel=JL1000&landing=JL1000&testId=relationship-attachment`,
+      linkUrl: `${window.location.origin}/?media=juliang&channel=JL1000&landing=JL1000&testId=relationship-attachment&disclaimer=${encodeURIComponent("测试结果仅供娱乐和参考！\n本测试为付费测试，付费后可查看测试结果。")}&advertiser=${encodeURIComponent("广州学诚网络科技有限公司")}`,
       subtitle: "亲密关系里的真实依恋线索",
       detailBody: "从互动模式、情绪反应与安全感需求三个维度，生成你的亲密关系洞察。",
+      disclaimerText: "测试结果仅供娱乐和参考！\n本测试为付费测试，付费后可查看测试结果。",
+      advertiserName: "广州学诚网络科技有限公司",
       buttonText: "马上测试",
       buttonStyle: "solid",
       themeColor: "#1D9E75",
@@ -1667,6 +1713,7 @@ export default function AdminDashboard({
     {
       id: "KS2000",
       name: "快手MBTI拟人物语爆款曝光",
+      mediaAccountId: "ks-ks2000",
       skuId: "sku-mbti-animal-standard",
       skuName: "假如MBTI有拟人：你的灵魂是哪种小动物/打工人？ 标准售卖SKU",
       testId: "mbti-animal",
@@ -1674,9 +1721,11 @@ export default function AdminDashboard({
       platform: "快手",
       price: 9.9,
       deductionPercent: 80,
-      linkUrl: `${window.location.origin}/?media=kuaishou&channel=KS2000&landing=KS2000&testId=mbti-animal`,
+      linkUrl: `${window.location.origin}/?media=kuaishou&channel=KS2000&landing=KS2000&testId=mbti-animal&disclaimer=${encodeURIComponent("测试结果仅供娱乐和参考！\n本测试为付费测试，付费后可查看测试结果。")}&advertiser=${encodeURIComponent("广州学诚网络科技有限公司")}`,
       subtitle: "把 MBTI 变成更容易传播的人设标签",
       detailBody: "用轻量题目生成拟人化人格画像，适合短视频曝光与裂变转化。",
+      disclaimerText: "测试结果仅供娱乐和参考！\n本测试为付费测试，付费后可查看测试结果。",
+      advertiserName: "广州学诚网络科技有限公司",
       buttonText: "马上测试",
       buttonStyle: "glow",
       themeColor: "#22c55e",
@@ -1691,6 +1740,7 @@ export default function AdminDashboard({
     {
       id: "JL1001",
       name: "微信高阶运势精准裂变2组",
+      mediaAccountId: "jl-jl1001",
       skuId: "sku-astrology-sun-moon-standard",
       skuName: "三主星深度星盘报告（太阳/月亮/上升） 标准售卖SKU",
       testId: "astrology-sun-moon",
@@ -1698,9 +1748,11 @@ export default function AdminDashboard({
       platform: "巨量",
       price: 29.9,
       deductionPercent: 65,
-      linkUrl: `${window.location.origin}/?media=juliang&channel=JL1001&landing=JL1001&testId=astrology-sun-moon`,
+      linkUrl: `${window.location.origin}/?media=juliang&channel=JL1001&landing=JL1001&testId=astrology-sun-moon&disclaimer=${encodeURIComponent("测试结果仅供娱乐和参考！\n本测试为付费测试，付费后可查看测试结果。")}&advertiser=${encodeURIComponent("广州学诚网络科技有限公司")}`,
       subtitle: "太阳、月亮、上升的完整星盘线索",
       detailBody: "从三主星组合解读近期状态、情绪底色与长期发展主题。",
+      disclaimerText: "测试结果仅供娱乐和参考！\n本测试为付费测试，付费后可查看测试结果。",
+      advertiserName: "广州学诚网络科技有限公司",
       buttonText: "查看报告",
       buttonStyle: "outline",
       themeColor: "#8b5cf6",
@@ -1730,16 +1782,31 @@ export default function AdminDashboard({
   };
 
   const [campaigns, setCampaigns] = useState<MarketingCampaign[]>(() => normalizeLandingIds(defaultCampaigns));
+  const getMediaAccount = (accountId?: string, platform?: string) =>
+    mediaAccounts.find((account) => account.id === accountId)
+    || mediaAccounts.find((account) => account.platform === platform)
+    || null;
 
-  const landingPlatformOptions = Array.from(new Set(campaigns.map((camp) => camp.platform).filter(Boolean))) as string[];
+  const landingPlatformOptions = Array.from(new Set([...mediaAccounts.map((account) => account.platform), ...campaigns.map((camp) => camp.platform)].filter(Boolean))) as string[];
   const filteredCampaigns = campaigns.filter((camp) => {
     const keyword = landingNameFilter.trim().toLowerCase();
+    const accountIdKeyword = landingMediaAccountIdFilter.trim().toLowerCase();
+    const accountNameKeyword = landingMediaAccountNameFilter.trim().toLowerCase();
     const sku = getProductSku(camp.skuId, camp.testId);
+    const mediaAccount = getMediaAccount(camp.mediaAccountId, camp.platform);
     const matchesName = !keyword || camp.name.toLowerCase().includes(keyword);
     const matchesPlatform = landingPlatformFilter === "all" || camp.platform === landingPlatformFilter;
     const matchesSku = landingSkuFilter === "all" || sku?.id === landingSkuFilter || camp.skuId === landingSkuFilter;
     const matchesCreatedDate = !landingCreatedDateFilter || camp.createdAt.startsWith(landingCreatedDateFilter);
-    return matchesName && matchesPlatform && matchesSku && matchesCreatedDate;
+    const matchesAccountId = !accountIdKeyword || (mediaAccount?.id || "").toLowerCase().includes(accountIdKeyword);
+    const matchesAccountName = !accountNameKeyword || (mediaAccount?.name || "").toLowerCase().includes(accountNameKeyword);
+    return matchesName && matchesPlatform && matchesSku && matchesCreatedDate && matchesAccountId && matchesAccountName;
+  });
+  const filteredMediaAccounts = mediaAccounts.filter((account) => {
+    const keyword = mediaAccountKeywordFilter.trim().toLowerCase();
+    const matchesPlatform = mediaAccountPlatformFilter === "all" || account.platform === mediaAccountPlatformFilter;
+    const matchesKeyword = !keyword || account.id.toLowerCase().includes(keyword) || account.name.toLowerCase().includes(keyword);
+    return matchesPlatform && matchesKeyword;
   });
   const getOrderPaymentMethodValue = (order: CalculationOrder): "wechat" | "alipay" =>
     order.paymentMethod || (Number(order.id.replace(/\D/g, "")) % 2 === 0 ? "alipay" : "wechat");
@@ -1842,11 +1909,15 @@ export default function AdminDashboard({
 
   const filteredOrders = orders.filter((order) => {
     const paymentMethod = getOrderPaymentMethodValue(order);
+    const normalizedPhoneFilter = orderPhoneFilter.replace(/\D/g, "");
+    const normalizedOrderPhone = (order.phone || "").replace(/\D/g, "");
     const matchesDate = !orderDateFilter || order.createdAt.startsWith(orderDateFilter);
+    const matchesOrderNo = !orderNoFilter.trim() || order.id.toLowerCase().includes(orderNoFilter.trim().toLowerCase());
+    const matchesPhone = !normalizedPhoneFilter || normalizedOrderPhone.includes(normalizedPhoneFilter);
     const matchesStatus = orderStatusFilter === "all" || order.status === orderStatusFilter;
     const matchesPaymentMethod = orderPaymentMethodFilter === "all" || paymentMethod === orderPaymentMethodFilter;
 
-    return matchesDate && matchesStatus && matchesPaymentMethod;
+    return matchesDate && matchesOrderNo && matchesPhone && matchesStatus && matchesPaymentMethod;
   }).sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
 
   const copyLandingLink = async (camp: MarketingCampaign) => {
@@ -1865,8 +1936,18 @@ export default function AdminDashboard({
     return { sku, test };
   };
 
-  const buildLandingLink = (platform: string, id: string, sku?: ProductSku, testId?: string) =>
-    `${window.location.origin}/?media=${getMediaPlatformKey(platform)}&channel=${id}&landing=${id}&skuId=${sku?.id || ""}&testId=${sku?.projectId || testId || ""}`;
+  const buildLandingLink = (platform: string, id: string, sku?: ProductSku, testId?: string, disclaimerText?: string, advertiserName?: string) => {
+    const params = new URLSearchParams({
+      media: getMediaPlatformKey(platform),
+      channel: id,
+      landing: id,
+      skuId: sku?.id || "",
+      testId: sku?.projectId || testId || ""
+    });
+    if (disclaimerText?.trim()) params.set("disclaimer", disclaimerText.trim());
+    if (advertiserName?.trim()) params.set("advertiser", advertiserName.trim());
+    return `${window.location.origin}/?${params.toString()}`;
+  };
 
   const generateLandingId = (platform: "巨量" | "快手") => {
     const prefix = platform === "快手" ? "KS" : "JL";
@@ -1890,13 +1971,17 @@ export default function AdminDashboard({
   const resetLandingForm = (skuId?: string) => {
     const defaultSku = getProductSku(skuId);
     const defaultTest = defaultSku ? tests.find((test) => test.id === defaultSku.projectId) : tests[0];
+    const defaultAccount = mediaAccounts.find((account) => account.platform === "巨量");
     setEditingLandingId(null);
     setLandingFormName(defaultTest ? `${defaultTest.name.slice(0, 20)}投放页` : "新增落地页");
     setLandingFormPlatform("巨量");
+    setLandingFormMediaAccountId(defaultAccount?.id || "");
     setLandingFormDeduction("100");
     setLandingFormSkuId(defaultSku?.id || "");
     setLandingFormHeroImage(defaultTest?.detailHeroImage || "");
     setLandingFormDetailBody(defaultTest?.detailBody || defaultTest?.description || "");
+    setLandingFormDisclaimerText("测试结果仅供娱乐和参考！\n本测试为付费测试，付费后可查看测试结果。");
+    setLandingFormAdvertiserName("广州学诚网络科技有限公司");
     setLandingFormButtonText(defaultTest?.detailButtonText || "马上测试");
     setLandingFormButtonStyle("solid");
     setLandingFormThemeColor(defaultTest?.detailThemeColor || "#1D9E75");
@@ -1912,14 +1997,25 @@ export default function AdminDashboard({
     setEditingLandingId(camp.id);
     setLandingFormName(camp.name);
     setLandingFormPlatform(camp.platform === "快手" ? "快手" : "巨量");
+    setLandingFormMediaAccountId(camp.mediaAccountId || getMediaAccount(undefined, camp.platform)?.id || "");
     setLandingFormDeduction(String(camp.deductionPercent));
     setLandingFormSkuId(sku?.id || camp.skuId || "");
     setLandingFormHeroImage(camp.heroImage || test?.detailHeroImage || "");
     setLandingFormDetailBody(camp.detailBody || test?.detailBody || test?.description || "");
+    setLandingFormDisclaimerText(camp.disclaimerText || "测试结果仅供娱乐和参考！\n本测试为付费测试，付费后可查看测试结果。");
+    setLandingFormAdvertiserName(camp.advertiserName || "广州学诚网络科技有限公司");
     setLandingFormButtonText(camp.buttonText || test?.detailButtonText || "马上测试");
     setLandingFormButtonStyle(camp.buttonStyle || "solid");
     setLandingFormThemeColor(camp.themeColor || test?.detailThemeColor || "#1D9E75");
     setShowLandingModal(true);
+  };
+
+  const handleLandingPlatformChange = (platform: "巨量" | "快手") => {
+    setLandingFormPlatform(platform);
+    const currentAccount = getMediaAccount(landingFormMediaAccountId);
+    if (!currentAccount || currentAccount.platform !== platform) {
+      setLandingFormMediaAccountId(mediaAccounts.find((account) => account.platform === platform)?.id || "");
+    }
   };
 
   const handleLandingSkuChange = (skuId: string) => {
@@ -1932,6 +2028,7 @@ export default function AdminDashboard({
     if (test) {
       setLandingFormHeroImage(test.detailHeroImage || "");
       setLandingFormDetailBody(test.detailBody || test.description || "");
+      setLandingFormDisclaimerText("测试结果仅供娱乐和参考！\n本测试为付费测试，付费后可查看测试结果。");
       setLandingFormButtonText(test.detailButtonText || "马上测试");
       setLandingFormButtonStyle("solid");
       setLandingFormThemeColor(test.detailThemeColor || "#1D9E75");
@@ -1972,8 +2069,21 @@ export default function AdminDashboard({
       showAdminAlert("请选择关联SKU。");
       return;
     }
+    const selectedAccount = getMediaAccount(landingFormMediaAccountId);
+    if (!selectedAccount || selectedAccount.platform !== landingFormPlatform) {
+      showAdminAlert("请选择当前投放平台下的媒体账号。");
+      return;
+    }
     if (landingFormButtonText.trim().length > 10) {
       showAdminAlert("按钮文案字数不能超过10个字。");
+      return;
+    }
+    if (!landingFormDisclaimerText.trim()) {
+      showAdminAlert("请输入免责声明。");
+      return;
+    }
+    if (!landingFormAdvertiserName.trim()) {
+      showAdminAlert("请输入投放主体。");
       return;
     }
     const test = tests.find((item) => item.id === sku.projectId);
@@ -1983,6 +2093,7 @@ export default function AdminDashboard({
     const item: MarketingCampaign = {
       id,
       name: landingFormName.trim(),
+      mediaAccountId: selectedAccount.id,
       skuId: sku?.id,
       skuName: sku?.name,
       testId: sku?.projectId || test?.id || "mbti-standard",
@@ -1990,10 +2101,12 @@ export default function AdminDashboard({
       platform: landingFormPlatform,
       price: sku?.price || 19.9,
       deductionPercent: deduction,
-      linkUrl: buildLandingLink(landingFormPlatform, id, sku, test?.id),
+      linkUrl: buildLandingLink(landingFormPlatform, id, sku, test?.id, landingFormDisclaimerText, landingFormAdvertiserName),
       heroImage: landingFormHeroImage,
       subtitle: "",
       detailBody: landingFormDetailBody.trim(),
+      disclaimerText: landingFormDisclaimerText.trim(),
+      advertiserName: landingFormAdvertiserName.trim(),
       buttonText: landingFormButtonText.trim() || "马上测试",
       buttonStyle: landingFormButtonStyle,
       themeColor: landingFormThemeColor,
@@ -2021,6 +2134,72 @@ export default function AdminDashboard({
       return;
     }
     setCampaigns((prev) => prev.filter((item) => item.id !== camp.id));
+  };
+
+  const resetMediaAccountForm = () => {
+    setEditingMediaAccountId(null);
+    setMediaAccountIdInput("");
+    setMediaAccountNameInput("");
+    setMediaAccountPlatformInput("巨量");
+    setMediaAccountCompanyInput("");
+  };
+
+  const openCreateMediaAccount = () => {
+    resetMediaAccountForm();
+    setShowMediaAccountModal(true);
+  };
+
+  const openEditMediaAccount = (account: MediaAccount) => {
+    setEditingMediaAccountId(account.id);
+    setMediaAccountIdInput(account.id);
+    setMediaAccountNameInput(account.name);
+    setMediaAccountPlatformInput(account.platform);
+    setMediaAccountCompanyInput(account.company);
+    setShowMediaAccountModal(true);
+  };
+
+  const saveMediaAccount = () => {
+    const id = mediaAccountIdInput.trim();
+    const name = mediaAccountNameInput.trim();
+    const company = mediaAccountCompanyInput.trim();
+    if (!id) {
+      showAdminAlert("请输入媒体账号ID。");
+      return;
+    }
+    if (!editingMediaAccountId && mediaAccounts.some((account) => account.id.toLowerCase() === id.toLowerCase())) {
+      showAdminAlert("媒体账号ID已存在，请更换。");
+      return;
+    }
+    if (!name) {
+      showAdminAlert("请输入媒体账号名称。");
+      return;
+    }
+    if (!company) {
+      showAdminAlert("请输入开户公司。");
+      return;
+    }
+    const now = new Date().toISOString().substring(0, 16).replace("T", " ");
+    setMediaAccounts((prev) =>
+      editingMediaAccountId
+        ? prev.map((account) =>
+            account.id === editingMediaAccountId
+              ? { ...account, name, platform: mediaAccountPlatformInput, company }
+              : account
+          )
+        : [{ id, name, platform: mediaAccountPlatformInput, company, createdAt: now }, ...prev]
+    );
+    setShowMediaAccountModal(false);
+    resetMediaAccountForm();
+  };
+
+  const deleteMediaAccount = (account: MediaAccount) => {
+    const linkedCampaign = campaigns.find((camp) => camp.mediaAccountId === account.id);
+    if (linkedCampaign) {
+      showAdminAlert(`该媒体账号已关联落地页「${linkedCampaign.name}」，不允许删除。`);
+      return;
+    }
+    if (!window.confirm(`确认删除媒体账号「${account.name}」吗？删除后不可恢复。`)) return;
+    setMediaAccounts((prev) => prev.filter((item) => item.id !== account.id));
   };
 
   const menuItems: Array<{ key: MenuKey; label: string; icon: React.ReactNode; badge?: string | number }> = [
@@ -2108,23 +2287,28 @@ export default function AdminDashboard({
       productName,
       productPrice,
       payCount,
-      scanPayCount: Math.max(payCount, Math.round(payCount * (stage === 1 ? 1.18 : stage === 2 ? 1.28 : 1.4))),
+      deductedPayCount: Math.floor(payCount * (camp.deductionPercent / 100)),
       conversionRate: uv ? (payCount / uv) * 100 : 0,
+      refundCount: Math.floor(payCount * (stage === 1 ? 0.03 : stage === 2 ? 0.04 : 0.05)),
       income,
       reportViews: Math.max(0, Math.round((camp.reportViews || 0) * (stage === 1 ? 0.72 : stage === 2 ? 0.2 : 0.08)))
     };
   };
   const channelDataRows = campaigns.map((camp) => {
+    const mediaAccount = getMediaAccount(camp.mediaAccountId, camp.platform);
     const answerCount = Math.round(camp.requests * 0.76);
     const profileCount = Math.round(camp.requests * 0.58);
-    const validActions = answerCount + profileCount;
     const uv = Math.max(1, Math.round(camp.views * 0.82));
+    const validActions = Math.min(uv, Math.max(answerCount, profileCount));
     const firstPays = Math.max(camp.pays, Math.round(camp.pays * 1.08));
     const secondPays = Math.round(camp.pays * 0.42);
     const thirdPays = Math.round(camp.pays * 0.18);
-    const first = buildPurchaseStage(camp, 1, firstPays, uv);
-    const second = buildPurchaseStage(camp, 2, secondPays, uv);
-    const third = buildPurchaseStage(camp, 3, thirdPays, uv);
+    const firstBase = buildPurchaseStage(camp, 1, firstPays, uv);
+    const secondBase = buildPurchaseStage(camp, 2, secondPays, uv);
+    const thirdBase = buildPurchaseStage(camp, 3, thirdPays, uv);
+    const first = { ...firstBase, cumulativeRoi: camp.adSpend ? firstBase.income / camp.adSpend : 0 };
+    const second = { ...secondBase, cumulativeRoi: camp.adSpend ? (firstBase.income + secondBase.income) / camp.adSpend : 0 };
+    const third = { ...thirdBase, cumulativeRoi: camp.adSpend ? (firstBase.income + secondBase.income + thirdBase.income) / camp.adSpend : 0 };
     const totalPayCount = camp.pays;
     const totalIncome = first.income + second.income + third.income;
     const acquisitionCost = totalPayCount ? camp.adSpend / totalPayCount : 0;
@@ -2133,8 +2317,8 @@ export default function AdminDashboard({
     return {
       camp,
       date: camp.createdAt.slice(0, 10),
-      campaignId: `${camp.platform === "快手" ? "ks" : "jl"}-${camp.id.toLowerCase()}`,
-      account: `${camp.platform}投放账号-${camp.id.slice(-4)}`,
+      campaignId: mediaAccount?.id || `${camp.platform === "快手" ? "ks" : "jl"}-${camp.id.toLowerCase()}`,
+      account: mediaAccount?.name || `${camp.platform}投放账号-${camp.id.slice(-4)}`,
       plan: `${camp.id}-PLAN`,
       planName: getChannelPlanName(camp),
       pv: camp.views,
@@ -2142,7 +2326,7 @@ export default function AdminDashboard({
       answerCount,
       profileCount,
       validActions,
-      validActionRate: uv ? (validActions / uv) * 100 : 0,
+      validActionRate: uv ? Math.min(100, (validActions / uv) * 100) : 0,
       first,
       second,
       third,
@@ -2156,8 +2340,10 @@ export default function AdminDashboard({
     const matchesDate = !channelDateFilter || row.date === channelDateFilter;
     const matchesName = !channelLandingNameFilter.trim() || row.camp.name.toLowerCase().includes(channelLandingNameFilter.trim().toLowerCase());
     const matchesPlatform = channelPlatformFilter === "all" || row.camp.platform === channelPlatformFilter;
+    const matchesAccountId = !channelAccountIdFilter.trim() || row.campaignId.toLowerCase().includes(channelAccountIdFilter.trim().toLowerCase());
+    const matchesAccountName = !channelAccountNameFilter.trim() || row.account.toLowerCase().includes(channelAccountNameFilter.trim().toLowerCase());
     const matchesDeduction = !channelDeductionFilter.trim() || String(row.camp.deductionPercent).includes(channelDeductionFilter.trim());
-    return matchesDate && matchesName && matchesPlatform && matchesDeduction;
+    return matchesDate && matchesName && matchesPlatform && matchesAccountId && matchesAccountName && matchesDeduction;
   });
 
   const renderMarketing = () => (
@@ -2166,7 +2352,8 @@ export default function AdminDashboard({
         <div className="flex gap-2 rounded-2xl border border-neutral-800 bg-neutral-950 p-2 w-fit">
           {[
             ["landing", "落地页列表"],
-            ["data", "渠道数据"]
+            ["data", "渠道数据"],
+            ["accounts", "媒体账号"]
           ].map(([key, label]) => (
             <button
               key={key}
@@ -2188,12 +2375,21 @@ export default function AdminDashboard({
             <Plus className="h-3.5 w-3.5" /> 新增落地页
           </button>
         )}
+        {marketingTab === "accounts" && (
+          <button
+            type="button"
+            onClick={openCreateMediaAccount}
+            className="flex items-center gap-1 rounded-xl bg-[#1D9E75] px-3.5 py-2 text-xs font-bold text-slate-950 shadow shadow-[#0A3B2D]/50 transition-colors hover:bg-[#31B58C]"
+          >
+            <Plus className="h-3.5 w-3.5" /> 新增媒体账号
+          </button>
+        )}
       </div>
 
       {marketingTab === "landing" ? (
         <div className="space-y-4">
           <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-4">
-            <div className="grid items-end gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="grid items-end gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
               <label className="flex w-full flex-col gap-1">
                 <span className="text-xs font-bold text-slate-500">落地页名称</span>
                 <input
@@ -2211,6 +2407,24 @@ export default function AdminDashboard({
                 options={[{ value: "all", label: "全部平台" }, ...landingPlatformOptions.map((platform) => ({ value: platform, label: platform }))]}
                 onChange={(value) => setLandingPlatformFilter(value as "all" | "巨量" | "快手")}
               />
+              <label className="flex w-full flex-col gap-1">
+                <span className="text-xs font-bold text-slate-500">投放账号ID</span>
+                <input
+                  value={landingMediaAccountIdFilter}
+                  onChange={(event) => setLandingMediaAccountIdFilter(event.target.value)}
+                  placeholder="输入投放账号ID筛选"
+                  className="h-10 w-full rounded-xl border border-neutral-800 bg-[#030713] px-3 text-xs text-slate-200 outline-none placeholder:text-slate-600 focus:border-[#1D9E75]"
+                />
+              </label>
+              <label className="flex w-full flex-col gap-1">
+                <span className="text-xs font-bold text-slate-500">投放账号名称</span>
+                <input
+                  value={landingMediaAccountNameFilter}
+                  onChange={(event) => setLandingMediaAccountNameFilter(event.target.value)}
+                  placeholder="输入投放账号名称筛选"
+                  className="h-10 w-full rounded-xl border border-neutral-800 bg-[#030713] px-3 text-xs text-slate-200 outline-none placeholder:text-slate-600 focus:border-[#1D9E75]"
+                />
+              </label>
               <FilterDropdown
                 id="landing-sku-filter"
                 label="关联商品"
@@ -2236,12 +2450,14 @@ export default function AdminDashboard({
               <span className="text-xs font-bold text-slate-400">落地页列表 ({filteredCampaigns.length})</span>
             </div>
             <div className="overflow-x-auto">
-              <table className="min-w-[1360px] w-full table-fixed text-left text-xs text-slate-300">
+              <table className="min-w-[1700px] w-full table-fixed text-left text-xs text-slate-300">
               <thead className="border-b border-neutral-800 bg-[#090d16]/30 font-mono text-[10px] text-slate-500">
                 <tr>
                   <th className="w-[90px] p-3 pl-4">落地页ID</th>
                   <th className="w-[210px] p-3">落地页名称</th>
                   <th className="w-[76px] p-3">投放平台</th>
+                  <th className="w-[160px] p-3">投放账号ID</th>
+                  <th className="w-[180px] p-3">投放账号名称</th>
                   <th className="w-[82px] p-3">回传比例</th>
                   <th className="w-[330px] p-3">关联商品</th>
                   <th className="w-[330px] p-3">落地页链接</th>
@@ -2253,6 +2469,7 @@ export default function AdminDashboard({
               <tbody className="divide-y divide-neutral-800">
                 {filteredCampaigns.map((camp) => {
                   const sku = getProductSku(camp.skuId, camp.testId);
+                  const mediaAccount = getMediaAccount(camp.mediaAccountId, camp.platform);
                   return (
                     <tr key={camp.id} className="hover:bg-neutral-900/30">
                       <td className="whitespace-nowrap p-3 pl-4 font-mono font-bold text-[#1D9E75]">{camp.id}</td>
@@ -2262,6 +2479,10 @@ export default function AdminDashboard({
                         </div>
                       </td>
                       <td className="whitespace-nowrap p-3">{camp.platform}</td>
+                      <td className="whitespace-nowrap p-3 font-mono text-slate-400">{mediaAccount?.id || "-"}</td>
+                      <td className="p-3">
+                        <div className="truncate text-slate-300" title={mediaAccount?.name || "-"}>{mediaAccount?.name || "-"}</div>
+                      </td>
                       <td className="whitespace-nowrap p-3 font-mono text-[#1D9E75]">{camp.deductionPercent}%</td>
                       <td className="p-3">
                         <div className="truncate text-[#1D9E75]" title={sku?.name || camp.skuName || camp.testName}>
@@ -2321,7 +2542,7 @@ export default function AdminDashboard({
                 })}
                 {filteredCampaigns.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="p-8 text-center text-xs text-slate-500">
+                    <td colSpan={11} className="p-8 text-center text-xs text-slate-500">
                       暂无匹配落地页
                     </td>
                   </tr>
@@ -2331,27 +2552,27 @@ export default function AdminDashboard({
           </div>
         </div>
         </div>
-      ) : (
+      ) : marketingTab === "data" ? (
         <div className="space-y-4">
         <div className="relative z-20 rounded-2xl border border-neutral-800 bg-neutral-950 p-4">
-          <div className="grid items-end gap-3 xl:grid-cols-[180px_280px_220px_180px]">
-            <label className="flex w-full flex-col gap-1 text-xs font-bold text-slate-500">
-              日期
+          <div className="grid items-end gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+            <label className="flex w-full flex-col gap-1">
+              <span className="text-xs font-bold text-slate-500">日期</span>
               <input
                 type="date"
                 value={channelDateFilter}
                 onChange={(event) => setChannelDateFilter(event.target.value)}
                 style={{ colorScheme: "dark" }}
-                className="h-10 w-full rounded-xl border border-neutral-800 bg-[#030713] px-3 text-xs text-slate-200 outline-none focus:border-[#1D9E75]"
+                className="h-10 w-full rounded-xl border border-neutral-800 bg-[#030713] px-3 text-xs text-slate-200 outline-none transition-colors focus:border-[#1D9E75]/70"
               />
             </label>
-            <label className="flex w-full flex-col gap-1 text-xs font-bold text-slate-500">
-              落地页名称
+            <label className="flex w-full flex-col gap-1">
+              <span className="text-xs font-bold text-slate-500">落地页名称</span>
               <input
                 value={channelLandingNameFilter}
                 onChange={(event) => setChannelLandingNameFilter(event.target.value)}
                 placeholder="输入落地页名称筛选"
-                className="h-10 w-full rounded-xl border border-neutral-800 bg-[#030713] px-3 text-xs text-slate-200 outline-none placeholder:text-slate-600 focus:border-[#1D9E75]"
+                className="h-10 w-full rounded-xl border border-neutral-800 bg-[#030713] px-3 text-xs text-slate-200 outline-none transition-colors placeholder:text-slate-600 focus:border-[#1D9E75]/70"
               />
             </label>
             <FilterDropdown
@@ -2362,8 +2583,26 @@ export default function AdminDashboard({
               options={[{ value: "all", label: "全部平台" }, ...landingPlatformOptions.map((platform) => ({ value: platform, label: platform }))]}
               onChange={(value) => setChannelPlatformFilter(value as "all" | "巨量" | "快手")}
             />
-            <label className="flex w-full flex-col gap-1 text-xs font-bold text-slate-500">
-              回传比例
+            <label className="flex w-full flex-col gap-1">
+              <span className="text-xs font-bold text-slate-500">投放账号ID</span>
+              <input
+                value={channelAccountIdFilter}
+                onChange={(event) => setChannelAccountIdFilter(event.target.value)}
+                placeholder="输入投放账号ID筛选"
+                className="h-10 w-full rounded-xl border border-neutral-800 bg-[#030713] px-3 text-xs text-slate-200 outline-none transition-colors placeholder:text-slate-600 focus:border-[#1D9E75]/70"
+              />
+            </label>
+            <label className="flex w-full flex-col gap-1">
+              <span className="text-xs font-bold text-slate-500">投放账号</span>
+              <input
+                value={channelAccountNameFilter}
+                onChange={(event) => setChannelAccountNameFilter(event.target.value)}
+                placeholder="输入投放账号筛选"
+                className="h-10 w-full rounded-xl border border-neutral-800 bg-[#030713] px-3 text-xs text-slate-200 outline-none transition-colors placeholder:text-slate-600 focus:border-[#1D9E75]/70"
+              />
+            </label>
+            <label className="flex w-full flex-col gap-1">
+              <span className="text-xs font-bold text-slate-500">回传比例</span>
               <input
                 type="number"
                 min={0}
@@ -2371,7 +2610,7 @@ export default function AdminDashboard({
                 value={channelDeductionFilter}
                 onChange={(event) => setChannelDeductionFilter(event.target.value)}
                 placeholder="输入回传比例"
-                className="h-10 w-full rounded-xl border border-neutral-800 bg-[#030713] px-3 text-xs text-slate-200 outline-none placeholder:text-slate-600 focus:border-[#1D9E75]"
+                className="h-10 w-full rounded-xl border border-neutral-800 bg-[#030713] px-3 text-xs text-slate-200 outline-none transition-colors placeholder:text-slate-600 focus:border-[#1D9E75]/70"
               />
             </label>
           </div>
@@ -2382,14 +2621,14 @@ export default function AdminDashboard({
             <p className="mt-1 text-[10px] text-slate-500">按日期、广告计划与落地页组合生成数据；首购/二购/三购付费数按环节原始次数统计，总付费数按后台去重口径统计。</p>
           </div>
           <div className="overflow-x-auto overflow-y-visible">
-            <table className="min-w-[3860px] w-full table-fixed text-left text-[11px] text-slate-300">
+            <table className="min-w-[4520px] w-full table-fixed text-left text-[11px] text-slate-300">
               <thead className="border-b border-neutral-800 bg-[#090d16]/30 text-[10px] text-slate-500">
                 <tr>
                   <th colSpan={8} className="border-r border-neutral-800 p-3 text-[#9CE6CF]">基础归因</th>
                   <th colSpan={5} className="border-r border-neutral-800 p-3 text-[#9CE6CF]">访问与有效行为</th>
-                  <th colSpan={7} className="border-r border-neutral-800 p-3 text-[#9CE6CF]">首购</th>
-                  <th colSpan={7} className="border-r border-neutral-800 p-3 text-[#9CE6CF]">二购</th>
-                  <th colSpan={7} className="border-r border-neutral-800 p-3 text-[#9CE6CF]">三购</th>
+                  <th colSpan={9} className="border-r border-neutral-800 p-3 text-[#9CE6CF]">首购</th>
+                  <th colSpan={9} className="border-r border-neutral-800 p-3 text-[#9CE6CF]">二购</th>
+                  <th colSpan={9} className="border-r border-neutral-800 p-3 text-[#9CE6CF]">三购</th>
                   <th colSpan={5} className="p-3 text-[#9CE6CF]">汇总</th>
                 </tr>
                 <tr className="border-t border-neutral-800">
@@ -2406,27 +2645,33 @@ export default function AdminDashboard({
                     ["访问UV", "w-[78px]"],
                     ["答题数", "w-[78px]"],
                     ["填写资料", "w-[78px]"],
-                    ["有效行为转化率", "w-[116px]", "有效行为转化率 = 总有效行为数 / 访问UV\n总有效行为数 = 答题数 + 填写资料"],
+                    ["有效行为转化率", "w-[116px]", "有效行为转化率 = 去重有效行为用户数 / 访问UV\n去重有效行为用户数不超过访问UV"],
                     ["购买商品", "w-[320px]"],
                     ["价格", "w-[72px]"],
                     ["付费数", "w-[70px]"],
-                    ["扫码后付费数", "w-[104px]"],
+                    ["扣量付费数", "w-[104px]", "扣量付费数 = floor(真实付费数 × 回传比例)\n结果向下取整"],
                     ["付费转化率", "w-[96px]", "首购付费转化率 = 首购付费数 / 访问UV"],
+                    ["退款数", "w-[76px]"],
                     ["付费收入", "w-[92px]"],
+                    ["累计ROI", "w-[86px]", "首购累计ROI = 首购累计付费收入 / 投放消耗金额"],
                     ["报告查看数", "w-[96px]"],
                     ["购买商品", "w-[320px]"],
                     ["价格", "w-[72px]"],
                     ["付费数", "w-[70px]"],
-                    ["扫码后付费数", "w-[104px]"],
+                    ["扣量付费数", "w-[104px]", "扣量付费数 = floor(真实付费数 × 回传比例)\n结果向下取整"],
                     ["付费转化率", "w-[96px]", "二购付费转化率 = 二购付费数 / 访问UV"],
+                    ["退款数", "w-[76px]"],
                     ["付费收入", "w-[92px]"],
+                    ["累计ROI", "w-[86px]", "二购累计ROI = (首购付费收入 + 二购付费收入) / 投放消耗金额"],
                     ["报告查看数", "w-[96px]"],
                     ["购买商品", "w-[320px]"],
                     ["价格", "w-[72px]"],
                     ["付费数", "w-[70px]"],
-                    ["扫码后付费数", "w-[104px]"],
+                    ["扣量付费数", "w-[104px]", "扣量付费数 = floor(真实付费数 × 回传比例)\n结果向下取整"],
                     ["付费转化率", "w-[96px]", "三购付费转化率 = 三购付费数 / 访问UV"],
+                    ["退款数", "w-[76px]"],
                     ["付费收入", "w-[92px]"],
+                    ["累计ROI", "w-[86px]", "三购累计ROI = (首购付费收入 + 二购付费收入 + 三购付费收入) / 投放消耗金额"],
                     ["报告查看数", "w-[96px]"],
                     ["总付费数", "w-[82px]", "总付费数 = 后台订单去重后的付费用户/订单数\n首购、二购、三购付费数按环节原始次数统计，不在这里相加"],
                     ["总付费收入", "w-[100px]"],
@@ -2481,9 +2726,11 @@ export default function AdminDashboard({
                       </td>
                       <td className="whitespace-nowrap p-3 font-mono text-red-300">{formatAdminMoney(stage.productPrice)}</td>
                       <td className="whitespace-nowrap p-3 font-mono">{stage.payCount}</td>
-                      <td className="whitespace-nowrap p-3 font-mono">{stage.scanPayCount}</td>
+                      <td className="whitespace-nowrap p-3 font-mono">{stage.deductedPayCount}</td>
                       <td className="whitespace-nowrap p-3 font-mono text-cyan-300">{formatAdminPercent(stage.conversionRate)}</td>
+                      <td className="whitespace-nowrap p-3 font-mono">{stage.refundCount}</td>
                       <td className="whitespace-nowrap p-3 font-mono text-[#1D9E75]">{formatAdminMoney(stage.income)}</td>
+                      <td className="whitespace-nowrap p-3 font-mono text-cyan-300">{stage.cumulativeRoi ? stage.cumulativeRoi.toFixed(2) : "-"}</td>
                       <td className="whitespace-nowrap p-3 font-mono">{stage.reportViews}</td>
                     </>
                   );
@@ -2521,7 +2768,7 @@ export default function AdminDashboard({
                 })}
                 {filteredChannelDataRows.length === 0 && (
                   <tr>
-                    <td colSpan={39} className="p-8 text-center text-xs text-slate-500">
+                    <td colSpan={45} className="p-8 text-center text-xs text-slate-500">
                       暂无匹配渠道数据
                     </td>
                   </tr>
@@ -2530,6 +2777,89 @@ export default function AdminDashboard({
             </table>
           </div>
         </div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-4">
+            <div className="grid items-end gap-4 md:grid-cols-[220px_320px]">
+              <FilterDropdown
+                id="media-account-platform-filter"
+                label="媒体平台"
+                value={mediaAccountPlatformFilter}
+                minWidth="min-w-0"
+                options={[
+                  { value: "all", label: "全部平台" },
+                  { value: "巨量", label: "巨量" },
+                  { value: "快手", label: "快手" }
+                ]}
+                onChange={(value) => setMediaAccountPlatformFilter(value as "all" | "巨量" | "快手")}
+              />
+              <label className="flex w-full flex-col gap-1">
+                <span className="text-xs font-bold text-slate-500">媒体账号</span>
+                <input
+                  value={mediaAccountKeywordFilter}
+                  onChange={(event) => setMediaAccountKeywordFilter(event.target.value)}
+                  placeholder="输入媒体账号ID/名称筛选"
+                  className="h-10 w-full rounded-xl border border-neutral-800 bg-[#030713] px-3 text-xs text-slate-200 outline-none placeholder:text-slate-600 focus:border-[#1D9E75]"
+                />
+              </label>
+            </div>
+          </div>
+          <div className="overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950">
+            <div className="border-b border-neutral-800 bg-neutral-900/30 p-4">
+              <span className="text-xs font-bold text-slate-400">媒体账号列表 ({filteredMediaAccounts.length})</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-[1080px] w-full table-fixed text-left text-xs text-slate-300">
+                <thead className="border-b border-neutral-800 bg-[#090d16]/30 text-[10px] text-slate-500">
+                  <tr>
+                    <th className="w-[160px] p-3 pl-4">媒体账号ID</th>
+                    <th className="w-[260px] p-3">媒体账号名称</th>
+                    <th className="w-[120px] p-3">媒体平台</th>
+                    <th className="w-[280px] p-3">开户公司</th>
+                    <th className="w-[140px] p-3">创建时间</th>
+                    <th className="w-[120px] p-3 pr-4 text-right">操作</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-800">
+                  {filteredMediaAccounts.map((account) => (
+                    <tr key={account.id} className="hover:bg-neutral-900/30">
+                      <td className="whitespace-nowrap p-3 pl-4 font-mono font-bold text-[#1D9E75]">{account.id}</td>
+                      <td className="p-3 font-bold text-slate-200">{account.name}</td>
+                      <td className="whitespace-nowrap p-3">{account.platform}</td>
+                      <td className="p-3 text-slate-400">{account.company}</td>
+                      <td className="whitespace-nowrap p-3 font-mono text-[11px] text-slate-500">{account.createdAt}</td>
+                      <td className="p-3 pr-4">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openEditMediaAccount(account)}
+                            className="rounded-lg border border-neutral-800 bg-neutral-900 px-2.5 py-1 text-[10px] text-slate-300 hover:border-[#1D9E75]/60 hover:text-[#9CE6CF]"
+                          >
+                            编辑
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteMediaAccount(account)}
+                            className="rounded-lg border border-red-900/60 bg-red-950/30 px-2.5 py-1 text-[10px] text-red-400 hover:bg-red-950/50"
+                          >
+                            删除
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {filteredMediaAccounts.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-xs text-slate-500">
+                        暂无匹配媒体账号
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -2602,11 +2932,24 @@ export default function AdminDashboard({
                       投放平台
                       <select
                         value={landingFormPlatform}
-                        onChange={(event) => setLandingFormPlatform(event.target.value as "巨量" | "快手")}
+                        onChange={(event) => handleLandingPlatformChange(event.target.value as "巨量" | "快手")}
                         className="h-10 w-full rounded-xl border border-neutral-800 bg-[#030713] px-3 text-xs text-slate-200 outline-none focus:border-[#1D9E75]"
                       >
                         <option value="巨量">巨量</option>
                         <option value="快手">快手</option>
+                      </select>
+                    </label>
+                    <label className="space-y-1.5 text-[10px] font-bold text-slate-500">
+                      媒体账号 <span className="text-[#1D9E75]">*</span>
+                      <select
+                        value={landingFormMediaAccountId}
+                        onChange={(event) => setLandingFormMediaAccountId(event.target.value)}
+                        className="h-10 w-full rounded-xl border border-neutral-800 bg-[#030713] px-3 text-xs text-slate-200 outline-none focus:border-[#1D9E75]"
+                      >
+                        <option value="">请选择媒体账号</option>
+                        {mediaAccounts.filter((account) => account.platform === landingFormPlatform).map((account) => (
+                          <option key={account.id} value={account.id}>{account.name}</option>
+                        ))}
                       </select>
                     </label>
                     <label className="space-y-1.5 text-[10px] font-bold text-slate-500">
@@ -2760,6 +3103,26 @@ export default function AdminDashboard({
                         />
                       </div>
                     </div>
+                    <div className="grid gap-3 md:col-span-2 md:grid-cols-[1fr_260px]">
+                      <label className="space-y-1.5 text-[10px] font-bold text-slate-500">
+                        免责声明 <span className="text-[#1D9E75]">*</span>
+                        <textarea
+                          value={landingFormDisclaimerText}
+                          onChange={(event) => setLandingFormDisclaimerText(event.target.value)}
+                          rows={3}
+                          className="min-h-[86px] w-full resize-none rounded-xl border border-neutral-800 bg-[#030713] px-3 py-2 text-xs leading-relaxed text-slate-200 outline-none focus:border-[#1D9E75]"
+                        />
+                      </label>
+                      <label className="space-y-1.5 text-[10px] font-bold text-slate-500">
+                        投放主体 <span className="text-[#1D9E75]">*</span>
+                        <input
+                          value={landingFormAdvertiserName}
+                          onChange={(event) => setLandingFormAdvertiserName(event.target.value)}
+                          className="h-10 w-full rounded-xl border border-neutral-800 bg-[#030713] px-3 text-xs text-slate-200 outline-none focus:border-[#1D9E75]"
+                        />
+                        <span className="block text-[9px] font-medium text-slate-600">仅投放落地页展示，普通商品详情页不展示该字段。</span>
+                      </label>
+                    </div>
                   </div>
                 </section>
               </div>
@@ -2831,6 +3194,15 @@ export default function AdminDashboard({
                         <p>1. 请在舒畅且无外界严重干扰的氛围中完成测评。</p>
                         <p>2. 所有档案信息经行业安全加密体系传输。</p>
                         <p>3. 报告将结合题库计分或资料推演生成。</p>
+                      </div>
+                    </section>
+
+                    <section className="rounded-2xl border border-neutral-900 bg-slate-950/60 p-4 text-[10.5px] text-slate-500 shadow-sm">
+                      <div className="space-y-1 leading-relaxed">
+                        {(landingFormDisclaimerText || "测试结果仅供娱乐和参考！\n本测试为付费测试，付费后可查看测试结果。").split("\n").filter(Boolean).map((line, index) => (
+                          <p key={`${line}-${index}`} className={index === 0 ? "font-bold text-slate-300" : ""}>{line}</p>
+                        ))}
+                        <p>投放主体：{landingFormAdvertiserName || "广州学诚网络科技有限公司"}</p>
                       </div>
                     </section>
 
@@ -3151,6 +3523,15 @@ export default function AdminDashboard({
                       />
                     </div>
                   </div>
+                  <label className="space-y-1 text-[10px] font-bold text-slate-500 md:col-span-2">
+                    免责声明 <span className="text-[#1D9E75]">*</span>
+                    <textarea
+                      value={itemDisclaimerText}
+                      onChange={(event) => setItemDisclaimerText(event.target.value)}
+                      rows={3}
+                      className="min-h-[86px] w-full resize-none rounded-xl border border-neutral-800 bg-slate-950 px-3 py-2 text-xs leading-relaxed text-slate-200 outline-none focus:border-[#1D9E75]"
+                    />
+                  </label>
                   <label className="space-y-1 text-[10px] font-bold text-slate-500">
                     按钮文案
                     <input maxLength={10} value={itemButtonText} onChange={(event) => setItemButtonText(event.target.value)} className="w-full rounded-xl border border-neutral-800 bg-slate-950 px-3 py-2 text-xs text-slate-200 outline-none focus:border-[#1D9E75]" />
@@ -4672,7 +5053,7 @@ export default function AdminDashboard({
   const renderOrders = () => (
     <div className="relative rounded-2xl border border-neutral-800 bg-neutral-950">
       <div className="relative z-20 border-b border-neutral-800 bg-neutral-900/30 p-4">
-        <div className="grid min-w-[760px] grid-cols-[210px_180px_190px] items-end gap-4">
+        <div className="grid min-w-[1120px] grid-cols-[210px_170px_210px_180px_190px] items-end gap-4">
           <label className="flex w-full flex-col gap-1 text-xs font-bold text-slate-500">
             日期
             <div className="relative">
@@ -4693,6 +5074,25 @@ export default function AdminDashboard({
                 <Calendar className="h-3.5 w-3.5" />
               </button>
             </div>
+          </label>
+          <label className="flex w-full flex-col gap-1 text-xs font-bold text-slate-500">
+            订单号
+            <input
+              value={orderNoFilter}
+              onChange={(event) => setOrderNoFilter(event.target.value)}
+              placeholder="输入订单号"
+              className="h-10 w-full rounded-xl border border-neutral-800 bg-[#030713] px-3 text-xs font-medium text-slate-200 outline-none transition-colors placeholder:text-slate-600 focus:border-[#1D9E75]"
+            />
+          </label>
+          <label className="flex w-full flex-col gap-1 text-xs font-bold text-slate-500">
+            手机号码
+            <input
+              value={orderPhoneFilter}
+              inputMode="numeric"
+              onChange={(event) => setOrderPhoneFilter(event.target.value.replace(/[^\d]/g, ""))}
+              placeholder="输入手机号码"
+              className="h-10 w-full rounded-xl border border-neutral-800 bg-[#030713] px-3 text-xs font-medium text-slate-200 outline-none transition-colors placeholder:text-slate-600 focus:border-[#1D9E75]"
+            />
           </label>
           <FilterDropdown
             id="order-status-filter"
@@ -4724,10 +5124,10 @@ export default function AdminDashboard({
         </div>
       </div>
       <div className="overflow-x-auto">
-        <table className="min-w-[1520px] w-full text-left text-xs text-slate-300">
+        <table className="min-w-[1640px] w-full text-left text-xs text-slate-300">
           <thead className="border-b border-neutral-800 bg-[#090d16]/30 text-[10px] text-slate-500">
             <tr>
-              {["日期", "订单号", "用户ID", "测算档案", "下单商品", "提交信息", "订单金额", "支付方式", "退款原因", "订单状态", "操作"].map((head) => (
+              {["日期", "订单号", "用户ID", "手机号码", "测算档案", "下单商品", "提交信息", "订单金额", "支付方式", "退款原因", "订单状态", "操作"].map((head) => (
                 <th key={head} className="p-3">
                   {head}
                 </th>
@@ -4747,6 +5147,7 @@ export default function AdminDashboard({
                   <td className="p-3 font-mono text-[10px] text-slate-400">{formatOrderDateTime(order.createdAt)}</td>
                   <td className="p-3 font-mono text-slate-500">{order.id}</td>
                   <td className="p-3 font-mono text-cyan-400">{account.userId}</td>
+                  <td className="p-3 font-mono text-slate-400">{order.phone || ""}</td>
                   <td className="p-3">
                     <div className="space-y-1 font-bold text-slate-200">
                       <div>
@@ -4835,7 +5236,7 @@ export default function AdminDashboard({
             })}
             {filteredOrders.length === 0 && (
               <tr>
-                <td colSpan={11} className="p-10 text-center text-xs text-slate-500">
+                <td colSpan={12} className="p-10 text-center text-xs text-slate-500">
                   {orders.length === 0 ? "暂无订单记录" : "暂无符合筛选条件的订单记录"}
                 </td>
               </tr>
@@ -4919,6 +5320,55 @@ export default function AdminDashboard({
     </div>
   );
 
+  const renderMediaAccountModal = () => {
+    if (!showMediaAccountModal) return null;
+    return (
+      <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-[#020617] p-6">
+        <div className="w-[min(560px,calc(100vw-2rem))] rounded-3xl border border-neutral-800 bg-neutral-950 p-5 shadow-2xl shadow-black">
+          <div className="mb-4 flex items-center justify-between border-b border-neutral-800 pb-3">
+            <div>
+              <h3 className="text-sm font-bold text-[#9CE6CF]">{editingMediaAccountId ? "编辑媒体账号" : "新增媒体账号"}</h3>
+              <p className="mt-1 text-[10px] text-slate-500">用于落地页绑定投放账号与渠道数据归因。</p>
+            </div>
+            <button type="button" onClick={() => { setShowMediaAccountModal(false); resetMediaAccountForm(); }} className="rounded-lg border border-neutral-800 p-2 text-slate-400" aria-label="关闭媒体账号弹窗">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="flex flex-col gap-1 text-[10px] font-bold text-slate-500">
+              媒体账号ID
+              <input
+                value={mediaAccountIdInput}
+                disabled={Boolean(editingMediaAccountId)}
+                onChange={(event) => setMediaAccountIdInput(event.target.value)}
+                className="h-10 rounded-xl border border-neutral-800 bg-[#030713] px-3 text-xs text-slate-200 outline-none focus:border-[#1D9E75] disabled:cursor-not-allowed disabled:text-slate-500"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-[10px] font-bold text-slate-500">
+              媒体账号名称
+              <input value={mediaAccountNameInput} onChange={(event) => setMediaAccountNameInput(event.target.value)} className="h-10 rounded-xl border border-neutral-800 bg-[#030713] px-3 text-xs text-slate-200 outline-none focus:border-[#1D9E75]" />
+            </label>
+            <label className="flex flex-col gap-1 text-[10px] font-bold text-slate-500">
+              媒体平台
+              <select value={mediaAccountPlatformInput} onChange={(event) => setMediaAccountPlatformInput(event.target.value as "巨量" | "快手")} className="h-10 rounded-xl border border-neutral-800 bg-[#030713] px-3 text-xs text-slate-200 outline-none focus:border-[#1D9E75]">
+                <option value="巨量">巨量</option>
+                <option value="快手">快手</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-[10px] font-bold text-slate-500">
+              开户公司
+              <input value={mediaAccountCompanyInput} onChange={(event) => setMediaAccountCompanyInput(event.target.value)} className="h-10 rounded-xl border border-neutral-800 bg-[#030713] px-3 text-xs text-slate-200 outline-none focus:border-[#1D9E75]" />
+            </label>
+          </div>
+          <div className="mt-5 flex justify-end gap-2 border-t border-neutral-800 pt-4">
+            <button type="button" onClick={() => { setShowMediaAccountModal(false); resetMediaAccountForm(); }} className="rounded-xl border border-neutral-800 bg-neutral-900 px-4 py-2 text-xs font-bold text-slate-300">取消</button>
+            <button type="button" onClick={saveMediaAccount} className="rounded-xl bg-[#1D9E75] px-4 py-2 text-xs font-bold text-slate-950">保存</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderContent = () => {
     if (activeMenu === "marketing") return renderMarketing();
     if (activeMenu === "orders") return renderOrders();
@@ -4979,6 +5429,7 @@ export default function AdminDashboard({
       </div>
       {activeMenu === "items" && renderItemModal()}
       {activeMenu === "marketing" && renderLandingModal()}
+      {activeMenu === "marketing" && renderMediaAccountModal()}
       {adminToast && (
         <div className="pointer-events-none fixed left-1/2 top-8 z-[1200] -translate-x-1/2 rounded-xl border border-[#1D9E75]/40 bg-[#071711]/95 px-4 py-2 text-xs font-bold text-[#9CE6CF] shadow-2xl shadow-black/40">
           {adminToast}

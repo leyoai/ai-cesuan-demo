@@ -344,6 +344,27 @@ export default function PhoneSimulator({
   const selectedProductSku = selectedTest ? getProductSku(selectedSkuId, selectedTest.id) : undefined;
   const selectedSalePrice = selectedProductSku?.price ?? selectedTest?.price ?? 0;
   const selectedOriginalPrice = selectedProductSku?.originalPrice ?? selectedTest?.originalPrice;
+  const landingLinkConfig = React.useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    return {
+      isLandingEntry: Boolean(params.get("landing") || params.get("channel") || params.get("media")),
+      testId: params.get("testId") || "",
+      skuId: params.get("skuId") || "",
+      disclaimerText: params.get("disclaimer") || "测试结果仅供娱乐和参考！\n本测试为付费测试，付费后可查看测试结果。",
+      advertiserName: params.get("advertiser") || "广州学诚网络科技有限公司"
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!landingLinkConfig.isLandingEntry && !landingLinkConfig.testId && !landingLinkConfig.skuId) return;
+    const targetSku = getProductSku(landingLinkConfig.skuId, landingLinkConfig.testId);
+    const resolvedTestId = targetSku?.projectId || landingLinkConfig.testId;
+    const targetTest = tests.find((test) => test.id === resolvedTestId);
+    if (!targetTest) return;
+    setSelectedSkuId(targetSku?.id || landingLinkConfig.skuId || null);
+    setSelectedTest(targetTest);
+    setActiveTab("home");
+  }, [landingLinkConfig, tests, productSkus]);
 
   const openConfiguredTarget = (testId: string, linkUrl?: string, skuId?: string) => {
     if (linkUrl?.trim()) {
@@ -1190,6 +1211,20 @@ export default function PhoneSimulator({
     </div>
   );
 
+  const DisclaimerNotice = () => {
+    const disclaimerText = landingLinkConfig.isLandingEntry
+      ? landingLinkConfig.disclaimerText
+      : selectedTest?.detailDisclaimerText || "测试结果仅供娱乐和参考！\n本测试为付费测试，付费后可查看测试结果。";
+    return (
+    <div className="rounded-xl border border-neutral-800 bg-slate-950/60 p-3 text-left text-[10px] leading-relaxed text-slate-500">
+      {disclaimerText.split("\n").filter(Boolean).map((line, index) => (
+        <p key={`${line}-${index}`} className={index === 0 ? "font-bold text-slate-300" : ""}>{line}</p>
+      ))}
+      {landingLinkConfig.isLandingEntry && <p>投放主体：{landingLinkConfig.advertiserName}</p>}
+    </div>
+    );
+  };
+
   return (
     <div id="phone-container" className="relative mx-auto w-[390px] h-[800px] bg-slate-950 rounded-[45px] border-[12px] border-amber-900/40 shadow-[0_0_50px_rgba(217,119,6,0.15)] flex flex-col overflow-hidden select-none">
       
@@ -1757,6 +1792,7 @@ export default function PhoneSimulator({
                         </div>
 
                         {/* Instant CTA Button Skipping multiple choice */}
+                        <DisclaimerNotice />
                         <AgreementNotice />
                         <motion.button
                           type="button"
@@ -2092,6 +2128,7 @@ export default function PhoneSimulator({
 
                         {/* BOTTOM ACTIONS BAR - Persisted Exactly like Competitor! */}
                         <div className="pt-2 flex flex-col space-y-2 bg-transparent">
+                          <DisclaimerNotice />
                           <AgreementNotice />
                           {/* Main Trigger */}
                           <motion.button
@@ -2156,7 +2193,9 @@ export default function PhoneSimulator({
                           </div>
                         </div>
 
-                    <motion.button
+                        <DisclaimerNotice />
+                        <AgreementNotice />
+                        <motion.button
                           type="button"
                           onClick={() => setTestPhase(getAssessmentMode(selectedTest) === "quiz_score" ? "quiz" : "form")}
                           className="w-full bg-gradient-to-r from-amber-500 via-yellow-400 to-orange-500 text-slate-950 font-extrabold py-3.5 px-4 rounded-xl text-xs tracking-wider cursor-pointer font-sans flex items-center justify-center gap-2 border border-amber-200/40 shadow-[0_10px_25px_rgba(245,158,11,0.25)] relative overflow-hidden"
@@ -2204,6 +2243,7 @@ export default function PhoneSimulator({
                             __html: selectedTest.detailBody || "系统将基于该测算内容模板，结合题库计分或资料推演结果，生成可解释、可执行的完整测算报告。"
                           }}
                         />
+                        <DisclaimerNotice />
                         <AgreementNotice />
                         <motion.button
                           type="button"
