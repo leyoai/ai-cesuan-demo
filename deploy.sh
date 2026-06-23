@@ -26,7 +26,7 @@ echo ""
 echo "[1/6] 检查 Git 仓库 ..."
 cd "${SCRIPT_DIR}"
 if [ -d .git ]; then
-  echo "  当前分支: $(git branch --show-current)"
+  echo "  当前分支: $(git rev-parse --abbrev-ref HEAD)"
   echo "  拉取最新代码 (${BRANCH}) ..."
   git checkout ${BRANCH}
   git pull origin ${BRANCH}
