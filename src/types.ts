@@ -9,7 +9,7 @@ export interface TestItem {
   category: "mbti" | "sbti" | "emotion" | "career" | "personality" | "astrology";
   assessmentMode?: "quiz_score" | "profile_inference";
   assessmentTarget?: "single" | "double";
-  profileFields?: Array<"userName" | "gender" | "birthDate" | "birthTime" | "question">;
+  profileFields?: Array<"userName" | "gender" | "birthDate" | "birthTime" | "birthPlace" | "question">;
   description: string;
   detailHeroImage?: string;
   detailSubtitle?: string;
@@ -54,6 +54,7 @@ export interface CalculationOrder {
   gender: "male" | "female" | "other";
   birthDate?: string; // YYYY-MM-DD
   birthTime?: string; // HH:MM
+  birthPlace?: string;
   partnerName?: string; // for relationship assessments
   partnerGender?: "male" | "female" | "other"; // for relationship assessments
   partnerBirthDate?: string; // YYYY-MM-DD

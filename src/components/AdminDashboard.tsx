@@ -250,8 +250,11 @@ export default function AdminDashboard({
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [itemName, setItemName] = useState("");
   const [itemCategory, setItemCategory] = useState<TestItem["category"]>("mbti");
+  const [itemAssessmentMode, setItemAssessmentMode] = useState<"quiz_score" | "profile_inference">("quiz_score");
   const [itemTarget, setItemTarget] = useState<"single" | "double">("single");
-  const [itemProfileFields, setItemProfileFields] = useState<Array<"userName" | "gender" | "birthDate" | "birthTime" | "question">>(["userName", "gender", "birthDate", "birthTime", "question"]);
+  const defaultProfileFields: NonNullable<TestItem["profileFields"]> = ["userName", "gender", "birthDate", "birthTime", "birthPlace", "question"];
+  const defaultQuizProfileFields: NonNullable<TestItem["profileFields"]> = ["gender"];
+  const [itemProfileFields, setItemProfileFields] = useState<NonNullable<TestItem["profileFields"]>>(defaultQuizProfileFields);
   const [itemQuestionBankIds, setItemQuestionBankIds] = useState<string[]>([]);
   const [itemQuestionSearch, setItemQuestionSearch] = useState("");
   const [itemPrice, setItemPrice] = useState("19.9");
@@ -344,21 +347,22 @@ export default function AdminDashboard({
     personality: "人格测试",
     astrology: "星座"
   };
-  const questionCategoryOptions = ["mbti", "sbti", "emotion", "career", "personality"] as const;
+  const questionCategoryOptions = ["mbti", "sbti", "emotion", "career", "personality", "astrology"] as const;
   const questionCategoryLabels: Record<(typeof questionCategoryOptions)[number], string> = {
     mbti: "MBTI",
     sbti: "SBTI",
     emotion: "情绪测试",
     career: "职业测试",
-    personality: "人格测试"
+    personality: "人格测试",
+    astrology: "星座"
   };
-  const contentCategoryOptions = [...questionCategoryOptions, "astrology"] as const;
   const questionCategoryBadgeClasses: Record<(typeof questionCategoryOptions)[number], string> = {
     mbti: "border-violet-500/50 bg-violet-950/50 text-violet-200",
     sbti: "border-sky-500/50 bg-sky-950/45 text-sky-200",
     emotion: "border-pink-500/50 bg-pink-950/45 text-pink-200",
     career: "border-[#1D9E75]/50 bg-[#1D9E75]/15 text-[#9CE6CF]",
-    personality: "border-amber-500/50 bg-[#1D9E75]/15 text-[#9CE6CF]"
+    personality: "border-amber-500/50 bg-[#1D9E75]/15 text-[#9CE6CF]",
+    astrology: "border-indigo-500/50 bg-indigo-950/45 text-indigo-200"
   };
   const questionCategoryOrder = questionCategoryOptions.reduce<Record<string, number>>((map, category, index) => {
     map[category] = index;
@@ -374,7 +378,8 @@ export default function AdminDashboard({
     sbti: ["外向值", "内向值", "理性值", "感性值", "行动值"],
     emotion: ["焦虑值", "压力值", "愉悦值", "稳定值"],
     career: ["兴趣值", "能力值", "稳定值", "发展值"],
-    personality: ["外向值", "敏感值", "理性值", "执行值", "稳定值"]
+    personality: ["外向值", "敏感值", "理性值", "执行值", "稳定值"],
+    astrology: ["太阳能量", "月亮能量", "上升能量", "关系能量", "行动建议"]
   };
   const questionOptionLabels = ["A", "B", "C", "D"];
 
@@ -632,15 +637,17 @@ export default function AdminDashboard({
     document.execCommand(command);
   };
 
-  const categoryHasQuestionEntry = (category: TestItem["category"]) => category !== "astrology";
+  const categoryHasQuestionEntry = (_category: TestItem["category"]) => true;
   const getCategoryAssessmentMode = (category: TestItem["category"]): "quiz_score" | "profile_inference" =>
     category === "astrology" ? "profile_inference" : "quiz_score";
+  const getResolvedItemAssessmentMode = () => itemCategory === "astrology" ? itemAssessmentMode : getCategoryAssessmentMode(itemCategory);
 
   const profileFieldLabels: Record<NonNullable<TestItem["profileFields"]>[number], string> = {
     userName: "姓名",
     gender: "性别",
     birthDate: "生日",
     birthTime: "生辰",
+    birthPlace: "出生地点",
     question: "用户问题"
   };
 
@@ -664,7 +671,10 @@ export default function AdminDashboard({
     { id: "q-personality-01", category: "personality", sequence: 1, dimension: "外向值 / 敏感值 / 理性值 / 执行值 / 稳定值", question: "进入陌生环境时，你通常会？", options: ["主动破冰", "先观察", "保持礼貌距离"], scores: ["外向值 +2", "敏感值 +2", "稳定值 +1"], linkedCount: 0 },
     { id: "q-personality-02", category: "personality", sequence: 2, dimension: "外向值 / 敏感值 / 理性值 / 执行值 / 稳定值", question: "计划被打断时，你最明显的反应是？", options: ["快速重排", "情绪受影响", "无所谓"], scores: ["执行值 +2", "敏感值 +2", "稳定值 +2"], linkedCount: 0 },
     { id: "q-personality-03", category: "personality", sequence: 3, dimension: "外向值 / 敏感值 / 理性值 / 执行值 / 稳定值", question: "面对复杂问题，你通常先做什么？", options: ["拆分变量", "凭感觉判断", "马上行动"], scores: ["理性值 +2", "敏感值 +1", "执行值 +2"], linkedCount: 0 },
-    { id: "q-personality-04", category: "personality", sequence: 4, dimension: "外向值 / 敏感值 / 理性值 / 执行值 / 稳定值", question: "别人评价你时，最常出现哪个关键词？", options: ["靠谱", "细腻", "有主见"], scores: ["稳定值 +2", "敏感值 +2", "理性值 +2"], linkedCount: 0 }
+    { id: "q-personality-04", category: "personality", sequence: 4, dimension: "外向值 / 敏感值 / 理性值 / 执行值 / 稳定值", question: "别人评价你时，最常出现哪个关键词？", options: ["靠谱", "细腻", "有主见"], scores: ["稳定值 +2", "敏感值 +2", "理性值 +2"], linkedCount: 0 },
+    { id: "q-astrology-01", category: "astrology", sequence: 1, dimension: "太阳能量 / 月亮能量 / 上升能量 / 关系能量 / 行动建议", question: "你最近最想从星盘里确认哪类主题？", options: ["自我定位", "关系走向", "事业节奏"], scores: ["太阳能量 +2", "关系能量 +2", "行动建议 +2"], linkedCount: 0 },
+    { id: "q-astrology-02", category: "astrology", sequence: 2, dimension: "太阳能量 / 月亮能量 / 上升能量 / 关系能量 / 行动建议", question: "面对重要变化时，你更常出现哪种反应？", options: ["主动推进", "情绪波动", "观察环境"], scores: ["太阳能量 +2", "月亮能量 +2", "上升能量 +2"], linkedCount: 0 },
+    { id: "q-astrology-03", category: "astrology", sequence: 3, dimension: "太阳能量 / 月亮能量 / 上升能量 / 关系能量 / 行动建议", question: "你希望报告给你的建议更偏向？", options: ["性格洞察", "关系提醒", "行动规划"], scores: ["上升能量 +2", "关系能量 +2", "行动建议 +2"], linkedCount: 0 }
   ]);
 
   const getProductSku = (skuId?: string, projectId?: string) =>
@@ -816,21 +826,21 @@ export default function AdminDashboard({
   };
   const itemFormSteps = [
     { key: "basic" as const, label: "基本信息" },
-    ...(itemCategory === "astrology" ? [] : [{ key: "questions" as const, label: "选择题目" }]),
+    ...(getResolvedItemAssessmentMode() === "quiz_score" ? [{ key: "questions" as const, label: "选择题目" }] : []),
     { key: "details" as const, label: "详情页配置" }
   ];
   const getNextItemFormStep = () => {
-    if (itemFormStep === "basic") return itemCategory === "astrology" ? "details" : "questions";
+    if (itemFormStep === "basic") return getResolvedItemAssessmentMode() === "quiz_score" ? "questions" : "details";
     if (itemFormStep === "questions") return "details";
     return "details";
   };
   const getPrevItemFormStep = () => {
-    if (itemFormStep === "details") return itemCategory === "astrology" ? "basic" : "questions";
+    if (itemFormStep === "details") return getResolvedItemAssessmentMode() === "quiz_score" ? "questions" : "basic";
     if (itemFormStep === "questions") return "basic";
     return "basic";
   };
   const validateBasicItemStep = () => {
-    const resolvedMode = getCategoryAssessmentMode(itemCategory);
+    const resolvedMode = getResolvedItemAssessmentMode();
     if (!itemName.trim()) {
       showAdminToast("请输入测算内容模板名称");
       return false;
@@ -839,14 +849,14 @@ export default function AdminDashboard({
       showAdminToast("模板名称字数不能超过30个字");
       return false;
     }
-    if (resolvedMode === "profile_inference" && itemProfileFields.length === 0) {
-      showAdminAlert("资料推演型内容模板需至少选择1个前置资料字段。");
+    if (itemProfileFields.length === 0) {
+      showAdminAlert("内容模板需至少选择1个前置资料字段。");
       return false;
     }
     return true;
   };
   const validateQuestionsItemStep = () => {
-    if (itemCategory !== "astrology" && getCategoryAssessmentMode(itemCategory) === "quiz_score" && itemQuestionBankIds.length === 0) {
+    if (getResolvedItemAssessmentMode() === "quiz_score" && itemQuestionBankIds.length === 0) {
       showAdminAlert("题库计分型内容模板需至少选择1道对应分类题目。");
       return false;
     }
@@ -859,7 +869,7 @@ export default function AdminDashboard({
   };
   const openQuestionBankFromItemModal = () => {
     setShowItemModal(false);
-    setQuestionFilter(itemCategory === "astrology" ? "all" : itemCategory);
+    setQuestionFilter(itemCategory);
     setActiveMenu("questionBank");
   };
 
@@ -1032,8 +1042,9 @@ export default function AdminDashboard({
     setItemFormStep("basic");
     setItemName("");
     setItemCategory("mbti");
+    setItemAssessmentMode("quiz_score");
     setItemTarget("single");
-    setItemProfileFields(["userName", "gender", "birthDate", "birthTime", "question"]);
+    setItemProfileFields(defaultQuizProfileFields);
     setItemQuestionBankIds([]);
     setItemQuestionSearch("");
     setItemPrice("19.9");
@@ -1053,12 +1064,15 @@ export default function AdminDashboard({
     setItemFormStep("basic");
     setItemName(test.name);
     setItemCategory(test.category);
+    setItemAssessmentMode(test.assessmentMode || getCategoryAssessmentMode(test.category));
     setItemTarget(test.assessmentTarget || "single");
-    setItemProfileFields(test.profileFields || ["userName", "gender", "birthDate", "birthTime", "question"]);
+    const nextAssessmentMode = test.assessmentMode || getCategoryAssessmentMode(test.category);
+    const nextProfileFields = test.profileFields || (nextAssessmentMode === "profile_inference" ? defaultProfileFields : defaultQuizProfileFields);
+    setItemProfileFields(test.category === "astrology" && nextAssessmentMode === "profile_inference" && !nextProfileFields.includes("birthPlace") ? [...nextProfileFields, "birthPlace"] : nextProfileFields);
     setItemQuestionBankIds(
       test.questionBankIds?.length
         ? test.questionBankIds
-        : getCategoryAssessmentMode(test.category) === "quiz_score" && categoryHasQuestionEntry(test.category)
+        : (test.assessmentMode || getCategoryAssessmentMode(test.category)) === "quiz_score"
           ? questionBankRows.filter((item) => item.category === test.category).map((item) => item.id)
           : []
     );
@@ -1076,7 +1090,7 @@ export default function AdminDashboard({
   };
 
   const saveItem = () => {
-    const resolvedMode = getCategoryAssessmentMode(itemCategory);
+    const resolvedMode = getResolvedItemAssessmentMode();
     if (!itemName.trim()) {
       showAdminToast("请输入测算内容模板名称");
       return;
@@ -1085,12 +1099,12 @@ export default function AdminDashboard({
       showAdminToast("模板名称字数不能超过30个字");
       return;
     }
-    if (resolvedMode === "quiz_score" && categoryHasQuestionEntry(itemCategory) && itemQuestionBankIds.length === 0) {
+    if (resolvedMode === "quiz_score" && itemQuestionBankIds.length === 0) {
       showAdminAlert("题库计分型内容模板需至少选择1道对应分类题目。");
       return;
     }
-    if (resolvedMode === "profile_inference" && itemProfileFields.length === 0) {
-      showAdminAlert("资料推演型内容模板需至少选择1个前置资料字段。");
+    if (itemProfileFields.length === 0) {
+      showAdminAlert("内容模板需至少选择1个前置资料字段。");
       return;
     }
     if (!itemDisclaimerText.trim()) {
@@ -1107,7 +1121,7 @@ export default function AdminDashboard({
       category: itemCategory,
       assessmentMode: resolvedMode,
       assessmentTarget: resolvedMode === "quiz_score" ? "single" : itemTarget,
-      profileFields: resolvedMode === "profile_inference" ? itemProfileFields : undefined,
+      profileFields: itemProfileFields,
       description: itemDescription.trim() || existing?.description || "后台新增测算商品。",
       detailHeroImage: itemHeroImage.trim(),
       detailBody: itemDetailBody.trim(),
@@ -1120,7 +1134,7 @@ export default function AdminDashboard({
       tag: existing?.tag || "新品",
       tagColor: existing?.tagColor || "amber",
       isActive: existing?.isActive ?? true,
-      questionBankIds: resolvedMode === "quiz_score" && categoryHasQuestionEntry(itemCategory) ? itemQuestionBankIds : [],
+      questionBankIds: resolvedMode === "quiz_score" ? itemQuestionBankIds : [],
       promptSourceTestId: referencedPrompt?.id,
       promptTemplateId: referencedPrompt?.id || `tpl-${safeId}`,
       promptTemplate,
@@ -3231,7 +3245,7 @@ export default function AdminDashboard({
   const renderItemModal = () => {
     if (!showItemModal) return null;
     const isLastStep = itemFormStep === "details";
-    const resolvedMode = getCategoryAssessmentMode(itemCategory);
+    const resolvedMode = getResolvedItemAssessmentMode();
 
     return (
       <div className="fixed inset-0 z-[999] flex items-center justify-center bg-[#020617] p-6">
@@ -3253,7 +3267,7 @@ export default function AdminDashboard({
                   onClick={() => {
                     if (step.key === "basic") setItemFormStep("basic");
                     if (step.key === "questions" && validateBasicItemStep()) setItemFormStep("questions");
-                    if (step.key === "details" && validateBasicItemStep() && (itemCategory === "astrology" || validateQuestionsItemStep())) setItemFormStep("details");
+                    if (step.key === "details" && validateBasicItemStep() && (getResolvedItemAssessmentMode() !== "quiz_score" || validateQuestionsItemStep())) setItemFormStep("details");
                   }}
                   className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-xs font-bold transition-colors ${
                     active
@@ -3291,16 +3305,19 @@ export default function AdminDashboard({
                       value={itemCategory}
                       onChange={(event) => {
                         const nextCategory = event.target.value as TestItem["category"];
+                        const nextMode = getCategoryAssessmentMode(nextCategory);
                         setItemCategory(nextCategory);
+                        setItemAssessmentMode(nextMode);
+                        setItemProfileFields(nextMode === "profile_inference" ? defaultProfileFields : defaultQuizProfileFields);
                         setItemQuestionBankIds([]);
                         setItemQuestionSearch("");
-                        if (nextCategory === "astrology") {
+                        if (nextMode === "profile_inference") {
                           if (itemFormStep === "questions") setItemFormStep("details");
                         }
                       }}
                       className="w-full rounded-xl border border-neutral-800 bg-slate-950 px-3 py-2 text-xs text-slate-200 outline-none focus:border-[#1D9E75]"
                     >
-                      {contentCategoryOptions.map((category) => (
+                      {questionCategoryOptions.map((category) => (
                         <option key={category} value={category}>
                           {categoryLabels[category]}
                         </option>
@@ -3310,10 +3327,24 @@ export default function AdminDashboard({
                   </label>
                   <label className="space-y-1 text-[10px] font-bold text-slate-500">
                     测算方式
-                    <div className="w-full rounded-xl border border-neutral-800 bg-slate-950 px-3 py-2 text-xs font-bold text-slate-200">
-                      {resolvedMode === "profile_inference" ? "资料推演" : "题库计分"}
-                    </div>
-                    <span className="block text-[9px] font-medium text-slate-600">根据测算分类自动匹配</span>
+                    <select
+                      disabled={itemCategory !== "astrology"}
+                      value={resolvedMode}
+                      onChange={(event) => {
+                        const nextMode = event.target.value as "quiz_score" | "profile_inference";
+                        setItemAssessmentMode(nextMode);
+                        setItemProfileFields(nextMode === "profile_inference" ? defaultProfileFields : defaultQuizProfileFields);
+                        if (nextMode === "profile_inference") {
+                          setItemQuestionBankIds([]);
+                          if (itemFormStep === "questions") setItemFormStep("details");
+                        }
+                      }}
+                      className="w-full rounded-xl border border-neutral-800 bg-slate-950 px-3 py-2 text-xs font-bold text-slate-200 outline-none focus:border-[#1D9E75] disabled:text-slate-600"
+                    >
+                      <option value="quiz_score">题库计分</option>
+                      <option value="profile_inference">资料推演</option>
+                    </select>
+                    <span className="block text-[9px] font-medium text-slate-600">{itemCategory === "astrology" ? "星座支持题库计分或资料推演" : "根据测算分类自动匹配"}</span>
                   </label>
                   <label className="space-y-1 text-[10px] font-bold text-slate-500">
                     测算对象
@@ -3323,9 +3354,8 @@ export default function AdminDashboard({
                     </select>
                   </label>
                 </div>
-                {resolvedMode === "profile_inference" && (
-                  <div className="space-y-2">
-                    <div className="text-[10px] font-bold text-slate-500">资料推演字段</div>
+                <div className="space-y-2">
+                    <div className="text-[10px] font-bold text-slate-500">{resolvedMode === "profile_inference" ? "资料推演字段" : "资料填写字段"}</div>
                     <div className="flex flex-wrap gap-2">
                       {(Object.keys(profileFieldLabels) as Array<keyof typeof profileFieldLabels>).map((field) => (
                         <label key={field} className="flex items-center gap-1.5 rounded-lg border border-neutral-800 bg-neutral-900 px-2.5 py-1.5 text-[10px] text-slate-300">
@@ -3339,11 +3369,10 @@ export default function AdminDashboard({
                       ))}
                     </div>
                   </div>
-                )}
                 </div>
               </section>}
 
-              {itemFormStep === "questions" && itemCategory !== "astrology" && <section className="flex h-full min-h-0 flex-col rounded-2xl border border-neutral-800 bg-slate-950/60 p-4 lg:col-span-2">
+              {itemFormStep === "questions" && resolvedMode === "quiz_score" && <section className="flex h-full min-h-0 flex-col rounded-2xl border border-neutral-800 bg-slate-950/60 p-4 lg:col-span-2">
                 <div className="mb-3 flex shrink-0 items-center justify-between gap-3">
                   <div>
                     <div className="text-xs font-bold text-[#1D9E75]">选择题目</div>
@@ -3364,7 +3393,7 @@ export default function AdminDashboard({
                     </div>
                   </div>
                 </div>
-                {resolvedMode === "quiz_score" && categoryHasQuestionEntry(itemCategory) ? (
+                {resolvedMode === "quiz_score" ? (
                   <>
                     <div className="mb-3 shrink-0">
                       <input
@@ -3421,7 +3450,7 @@ export default function AdminDashboard({
                     </div>
                   </>
                 ) : (
-                  <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-4 text-xs text-slate-500">测算分类为星座或测算方式为资料推演时，不需要选择题库题目。</div>
+                  <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-4 text-xs text-slate-500">测算方式为资料推演时，不需要选择题库题目。</div>
                 )}
               </section>}
 
@@ -3561,7 +3590,7 @@ export default function AdminDashboard({
               <button type="button" onClick={() => setItemFormStep(getPrevItemFormStep())} className="rounded-xl border border-neutral-800 bg-neutral-900 px-4 py-2 text-xs font-bold text-slate-300">上一步</button>
             )}
             <button type="button" onClick={isLastStep ? saveItem : goNextItemFormStep} className="rounded-xl bg-[#1D9E75] px-4 py-2 text-xs font-bold text-slate-950">
-              {isLastStep ? "保存" : itemCategory === "astrology" && itemFormStep === "basic" ? "下一步：详情页配置" : "下一步"}
+              {isLastStep ? "保存" : getResolvedItemAssessmentMode() !== "quiz_score" && itemFormStep === "basic" ? "下一步：详情页配置" : "下一步"}
             </button>
           </div>
         </div>
@@ -3638,7 +3667,7 @@ export default function AdminDashboard({
                 </button>
                 {openTemplateFilterSelect === "category" && (
                   <div className="absolute left-0 top-full z-50 mt-1 w-full overflow-hidden rounded-xl border border-neutral-800 bg-slate-950 py-1 shadow-2xl shadow-black">
-                    {[{ value: "all" as const, label: "全部分类" }, ...contentCategoryOptions.map((category) => ({ value: category, label: categoryLabels[category] }))].map((option) => (
+                    {[{ value: "all" as const, label: "全部分类" }, ...questionCategoryOptions.map((category) => ({ value: category, label: categoryLabels[category] }))].map((option) => (
                       <button
                         key={option.value}
                         type="button"

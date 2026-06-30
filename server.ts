@@ -417,8 +417,8 @@ const getAssessmentMode = (test: TestItem): "quiz_score" | "profile_inference" =
 const genderLabel = (gender?: CalculationOrder["gender"]) =>
   gender === "female" ? "女" : gender === "other" ? "其他" : "男";
 
-const buildProfileInfo = (order: Pick<CalculationOrder, "userName" | "gender" | "birthDate" | "birthTime" | "question">) =>
-  `姓名：${order.userName}；性别：${genderLabel(order.gender)}；出生日期：${order.birthDate || "未填写"}；出生时间：${order.birthTime || "未填写"}；咨询问题：${order.question || "无特定诉求"}`;
+const buildProfileInfo = (order: Pick<CalculationOrder, "userName" | "gender" | "birthDate" | "birthTime" | "birthPlace" | "question">) =>
+  `姓名：${order.userName}；性别：${genderLabel(order.gender)}；出生日期：${order.birthDate || "未填写"}；出生时间：${order.birthTime || "未填写"}；出生地点：${order.birthPlace || "未填写"}；咨询问题：${order.question || "无特定诉求"}`;
 
 const buildScoreSummary = (quizAnswers?: string) => {
   if (!quizAnswers) return "";
@@ -426,7 +426,7 @@ const buildScoreSummary = (quizAnswers?: string) => {
   return `题库计分结果：已完成 ${answerCount || "多"} 道题，系统已根据答案聚合维度倾向。维度摘要会用于约束 AI 只做解释和建议，不重新发明结论。`;
 };
 
-const buildTraditionalSummary = (test: TestItem, order: Pick<CalculationOrder, "userName" | "gender" | "birthDate" | "birthTime" | "question">) => {
+const buildTraditionalSummary = (test: TestItem, order: Pick<CalculationOrder, "userName" | "gender" | "birthDate" | "birthTime" | "birthPlace" | "question">) => {
   if (getAssessmentMode(test) === "quiz_score") {
     return "传统断语：题库计分型测算以题目得分作为基础结论，AI 只在该结论上补充解释、风险和行动建议。";
   }
@@ -446,6 +446,7 @@ const applyPromptVariables = (template: string, order: CalculationOrder) => {
     .replace(/\{Gender\}/g, genderLabel(order.gender))
     .replace(/\{Birth_Date\}/g, order.birthDate || "无需生日选项")
     .replace(/\{Birth_Time\}/g, order.birthTime || "无需出生时辰")
+    .replace(/\{Birth_Place\}/g, order.birthPlace || "无需出生地点")
     .replace(/\{Question\}/g, order.question || "无特定诉求")
     .replace(/\{Partner_Info\}/g, partnerInfo)
     .replace(/\{Partner_Name\}/g, order.partnerName || "未填写")
@@ -456,6 +457,7 @@ const applyPromptVariables = (template: string, order: CalculationOrder) => {
     .replace(/\${gender}/g, genderLabel(order.gender))
     .replace(/\${birthDate}/g, order.birthDate || "无需生日选项")
     .replace(/\${birthTime}/g, order.birthTime || "无需出生时辰")
+    .replace(/\${birthPlace}/g, order.birthPlace || "无需出生地点")
     .replace(/\${question}/g, order.question || "无特定诉求")
     .replace(/\${partnerName}/g, order.partnerName || "未填写")
     .replace(/\${partnerGender}/g, order.partnerGender ? genderLabel(order.partnerGender) : "未填写")
@@ -752,7 +754,7 @@ app.get("/api/orders", (req, res) => {
 
 // Create a pending (unpaid) order record
 app.post("/api/orders", (req, res) => {
-  const { testId, userName, gender, birthDate, birthTime, question, partnerName, partnerGender, partnerBirthDate, partnerBirthTime, quizAnswers, scoreSummary, traditionalSummary, paymentMethod, price } = req.body;
+  const { testId, userName, gender, birthDate, birthTime, birthPlace, question, partnerName, partnerGender, partnerBirthDate, partnerBirthTime, quizAnswers, scoreSummary, traditionalSummary, paymentMethod, price } = req.body;
   if (!testId || !userName) {
     return res.status(400).json({ error: "商品和用户名为必填项" });
   }
@@ -773,13 +775,14 @@ app.post("/api/orders", (req, res) => {
     gender: gender || "male",
     birthDate: birthDate || undefined,
     birthTime: birthTime || undefined,
+    birthPlace: birthPlace || undefined,
     partnerName: partnerName || undefined,
     partnerGender: partnerGender || undefined,
     partnerBirthDate: partnerBirthDate || undefined,
     partnerBirthTime: partnerBirthTime || undefined,
     quizAnswers: quizAnswers || undefined,
     scoreSummary: scoreSummary || buildScoreSummary(quizAnswers),
-    traditionalSummary: traditionalSummary || buildTraditionalSummary(selectedTest, { userName, gender: gender || "male", birthDate, birthTime, question: question || "无特定诉求" }),
+    traditionalSummary: traditionalSummary || buildTraditionalSummary(selectedTest, { userName, gender: gender || "male", birthDate, birthTime, birthPlace, question: question || "无特定诉求" }),
     question: question || "无特定诉求",
     price: typeof price === "number" && price >= 0 ? price : selectedTest.price,
     paymentMethod: paymentMethod === "alipay" ? "alipay" : "wechat",
@@ -1046,7 +1049,7 @@ app.post("/api/stats/mock-traffic", (req, res) => {
 
 // 7. Core client fortune-telling calculator integration (GEMINI POWERED)
 app.post("/api/orders/calculate", async (req, res) => {
-  const { testId, userName, gender, birthDate, birthTime, question, partnerName, partnerGender, partnerBirthDate, partnerBirthTime, quizAnswers, scoreSummary, traditionalSummary, paymentMethod, price } = req.body;
+  const { testId, userName, gender, birthDate, birthTime, birthPlace, question, partnerName, partnerGender, partnerBirthDate, partnerBirthTime, quizAnswers, scoreSummary, traditionalSummary, paymentMethod, price } = req.body;
 
   if (!testId || !userName) {
     return res.status(400).json({ error: "用户名与测评大类为必填参数" });
@@ -1074,13 +1077,14 @@ app.post("/api/orders/calculate", async (req, res) => {
     gender: gender || "male",
     birthDate: birthDate || undefined,
     birthTime: birthTime || undefined,
+    birthPlace: birthPlace || undefined,
     partnerName: partnerName || undefined,
     partnerGender: partnerGender || undefined,
     partnerBirthDate: partnerBirthDate || undefined,
     partnerBirthTime: partnerBirthTime || undefined,
     quizAnswers: quizAnswers || undefined,
     scoreSummary: scoreSummary || buildScoreSummary(quizAnswers),
-    traditionalSummary: traditionalSummary || buildTraditionalSummary(selectedTest, { userName, gender: gender || "male", birthDate, birthTime, question: question || "无特定诉求" }),
+    traditionalSummary: traditionalSummary || buildTraditionalSummary(selectedTest, { userName, gender: gender || "male", birthDate, birthTime, birthPlace, question: question || "无特定诉求" }),
     question: question || "无特定诉求，求批示人生大运与流年开解。",
     price: typeof price === "number" && price >= 0 ? price : selectedTest.price,
     paymentMethod: paymentMethod === "alipay" ? "alipay" : "wechat",

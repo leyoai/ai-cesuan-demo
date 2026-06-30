@@ -139,6 +139,35 @@ const QUIZ_QUESTIONS: Record<
         { label: "B", value: "融合需求", desc: "🤝 更希望彼此保持高频同步和即时回应" }
       ]
     }
+  ],
+  astrology: [
+    {
+      id: "Q1",
+      text: "1. 你最近最想从星盘里确认哪类主题？",
+      options: [
+        { label: "A", value: "自我定位", desc: "☀️ 更想看清自己的核心能量、优势和阶段定位" },
+        { label: "B", value: "关系走向", desc: "🌙 更想理解亲密关系、人际互动和情绪牵引" },
+        { label: "C", value: "事业节奏", desc: "🧭 更想获得行动建议、机会窗口和避坑提醒" }
+      ]
+    },
+    {
+      id: "Q2",
+      text: "2. 面对重要变化时，你更常出现哪种反应？",
+      options: [
+        { label: "A", value: "主动推进", desc: "🔥 先抓住机会行动，在尝试中校准方向" },
+        { label: "B", value: "情绪波动", desc: "🌊 会先感受内在安全感，再慢慢决定要不要改变" },
+        { label: "C", value: "观察环境", desc: "🌅 先观察外部反馈和他人态度，再调整呈现方式" }
+      ]
+    },
+    {
+      id: "Q3",
+      text: "3. 你希望报告给你的建议更偏向？",
+      options: [
+        { label: "A", value: "性格洞察", desc: "✨ 帮我解释为什么我会这样想、这样选择" },
+        { label: "B", value: "关系提醒", desc: "💫 帮我看懂互动模式和容易踩到的情绪点" },
+        { label: "C", value: "行动规划", desc: "🪐 给我可以直接执行的近期建议和节奏安排" }
+      ]
+    }
   ]
 };
 
@@ -149,11 +178,37 @@ const getAssessmentTarget = (test: TestItem): "single" | "double" =>
   test.assessmentTarget || "single";
 
 type ProfileField = NonNullable<TestItem["profileFields"]>[number];
+type ChinaRegionOption = {
+  province: string;
+  cities: Array<{ city: string; districts: string[] }>;
+};
 
-const getProfileFields = (test: TestItem): ProfileField[] =>
-  getAssessmentMode(test) === "profile_inference"
-    ? test.profileFields || ["userName", "gender", "birthDate", "birthTime", "question"]
-    : ["gender"];
+const DEFAULT_PROFILE_FIELDS: ProfileField[] = ["userName", "gender", "birthDate", "birthTime", "birthPlace", "question"];
+const CHINA_REGION_OPTIONS: ChinaRegionOption[] = [
+  { province: "北京市", cities: [{ city: "北京市", districts: ["东城区", "西城区", "朝阳区", "海淀区", "丰台区"] }] },
+  { province: "上海市", cities: [{ city: "上海市", districts: ["黄浦区", "徐汇区", "静安区", "浦东新区", "闵行区"] }] },
+  { province: "广东省", cities: [
+    { city: "广州市", districts: ["天河区", "越秀区", "海珠区", "番禺区"] },
+    { city: "深圳市", districts: ["南山区", "福田区", "罗湖区", "宝安区"] }
+  ] },
+  { province: "浙江省", cities: [
+    { city: "杭州市", districts: ["西湖区", "上城区", "拱墅区", "滨江区"] },
+    { city: "宁波市", districts: ["海曙区", "鄞州区", "江北区"] }
+  ] },
+  { province: "江苏省", cities: [
+    { city: "南京市", districts: ["玄武区", "秦淮区", "建邺区"] },
+    { city: "苏州市", districts: ["姑苏区", "工业园区", "吴中区"] }
+  ] },
+  { province: "四川省", cities: [{ city: "成都市", districts: ["锦江区", "青羊区", "武侯区", "高新区"] }] }
+];
+
+const getProfileFields = (test: TestItem): ProfileField[] => {
+  if (getAssessmentMode(test) === "quiz_score") return test.profileFields?.length ? test.profileFields : ["gender"];
+  const fields = test.profileFields || DEFAULT_PROFILE_FIELDS;
+  return test.category === "astrology" && !fields.includes("birthPlace")
+    ? [...fields, "birthPlace"]
+    : fields;
+};
 
 const getQuizQuestions = (test: TestItem) => QUIZ_QUESTIONS[test.category] || [];
 
@@ -204,6 +259,10 @@ export default function PhoneSimulator({
   const [gender, setGender] = useState<"male" | "female" | "other">("male");
   const [birthDate, setBirthDate] = useState("1996-06-09");
   const [birthTime, setBirthTime] = useState("12:00");
+  const [birthTimeUnknown, setBirthTimeUnknown] = useState(false);
+  const [birthProvince, setBirthProvince] = useState("北京市");
+  const [birthCity, setBirthCity] = useState("北京市");
+  const [birthDistrict, setBirthDistrict] = useState("东城区");
   const [question, setQuestion] = useState("");
   const [agreementChecked, setAgreementChecked] = useState(true);
 
@@ -221,7 +280,6 @@ export default function PhoneSimulator({
   // Competitive Payflow States
   const [showPreviewReport, setShowPreviewReport] = useState(false);
   const [showPaymentGate, setShowPaymentGate] = useState(false);
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [previewGenerating, setPreviewGenerating] = useState(false);
   const [previewStep, setPreviewStep] = useState(0);
   const [paymentFinished, setPaymentFinished] = useState(false);
@@ -247,10 +305,9 @@ export default function PhoneSimulator({
   const shownConversionPopupKeys = React.useRef<Set<string>>(new Set());
   const markedPopupOrderIds = React.useRef<Set<string>>(new Set());
   const resumePaymentPreviewRef = React.useRef(false);
-  const prepayPopupTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingOrderPromiseRef = React.useRef<Promise<CalculationOrder | null> | null>(null);
   const selectedTestRef = React.useRef<TestItem | null>(null);
   const calculationResultRef = React.useRef<CalculationOrder | null>(null);
-  const isProcessingPaymentRef = React.useRef(false);
 
   // Reset quiz states when selectedTest changes
   useEffect(() => {
@@ -261,7 +318,6 @@ export default function PhoneSimulator({
     setCurrentQuestionIndex(0);
     setShowPreviewReport(Boolean(shouldResumePayment));
     setShowPaymentGate(false);
-    setIsProcessingPayment(false);
     setPreviewGenerating(false);
     setPreviewStep(0);
     setPaymentFinished(false);
@@ -272,6 +328,7 @@ export default function PhoneSimulator({
     if (!shouldResumePayment) {
       setActivePaymentOrder(null);
     }
+    pendingOrderPromiseRef.current = null;
     setCountdown("29:42");
     if (selectedTest) {
       setTestPhase(shouldResumePayment ? "form" : "landing");
@@ -289,7 +346,6 @@ export default function PhoneSimulator({
 
   selectedTestRef.current = selectedTest;
   calculationResultRef.current = calculationResult;
-  isProcessingPaymentRef.current = isProcessingPayment;
 
   const activeRecommendationSlides = React.useMemo(() => {
     return [...(slides || [])]
@@ -449,26 +505,6 @@ export default function PhoneSimulator({
     setConversionPopupIndex(0);
     return true;
   };
-
-  useEffect(() => {
-    if (prepayPopupTimerRef.current) {
-      clearTimeout(prepayPopupTimerRef.current);
-      prepayPopupTimerRef.current = null;
-    }
-    if (!showPaymentGate) return;
-    prepayPopupTimerRef.current = setTimeout(() => {
-      const currentTest = selectedTestRef.current;
-      if (!currentTest || calculationResultRef.current || isProcessingPaymentRef.current) return;
-      openConversionPopup("prepay", currentTest.id, "payment-timeout");
-      prepayPopupTimerRef.current = null;
-    }, 9000);
-    return () => {
-      if (prepayPopupTimerRef.current) {
-        clearTimeout(prepayPopupTimerRef.current);
-        prepayPopupTimerRef.current = null;
-      }
-    };
-  }, [showPaymentGate]);
 
   // Time ticker for phone status bar
   const [currentTime, setCurrentTime] = useState("");
@@ -680,6 +716,22 @@ export default function PhoneSimulator({
     alert("验证码已发送。当前为原型演示，可输入任意验证码继续。");
   };
 
+  const selectedProvinceOption = CHINA_REGION_OPTIONS.find((item) => item.province === birthProvince) || CHINA_REGION_OPTIONS[0];
+  const cityOptions = selectedProvinceOption.cities;
+  const selectedCityOption = cityOptions.find((item) => item.city === birthCity) || cityOptions[0];
+  const districtOptions = selectedCityOption.districts;
+  const getBirthPlaceLabel = () => [birthProvince, birthCity, birthDistrict].filter(Boolean).join(" / ");
+  const setBirthPlaceFromText = (value?: string) => {
+    if (!value) return;
+    const parts = value.split(/\s*\/\s*/).filter(Boolean);
+    const province = CHINA_REGION_OPTIONS.find((item) => item.province === parts[0]) || CHINA_REGION_OPTIONS[0];
+    const city = province.cities.find((item) => item.city === parts[1]) || province.cities[0];
+    const district = city.districts.includes(parts[2]) ? parts[2] : city.districts[0];
+    setBirthProvince(province.province);
+    setBirthCity(city.city);
+    setBirthDistrict(district);
+  };
+
   const handlePayOrder = (order: CalculationOrder, e: React.MouseEvent) => {
     e.stopPropagation(); // prevent opening empty report
     const t = tests.find(x => x.id === order.testId);
@@ -691,6 +743,8 @@ export default function PhoneSimulator({
       setGender(order.gender);
       setBirthDate(order.birthDate || "");
       setBirthTime(order.birthTime || "");
+      setBirthTimeUnknown(!order.birthTime);
+      setBirthPlaceFromText(order.birthPlace);
       setPartnerName(order.partnerName || "");
       setPartnerGender(order.partnerGender || "female");
       setPartnerBirthDate(order.partnerBirthDate || "");
@@ -788,7 +842,8 @@ export default function PhoneSimulator({
       `称呼：${userName || "你"}`,
       `性别：${gender === "female" ? "女" : gender === "other" ? "其他" : "男"}`,
       birthDate ? `出生日期：${birthDate}` : "",
-      birthTime ? `出生时间：${birthTime}` : "",
+      getProfileFields(selectedTest).includes("birthTime") ? `出生时间：${birthTimeUnknown ? "未知" : birthTime}` : "",
+      getProfileFields(selectedTest).includes("birthPlace") ? `出生地点：${getBirthPlaceLabel()}` : "",
       question.trim() ? `咨询问题：${question.trim()}` : ""
     ].filter(Boolean).join("；");
     return `传统断语预览：基于${profileText}，先由确定性传统规则给出基础判断，再由 AI 在不否定该判断的前提下补充完整报告。`;
@@ -799,7 +854,7 @@ export default function PhoneSimulator({
     if (!selectedTest) return null;
     const mode = getAssessmentMode(selectedTest);
     const hasQuiz = mode === "quiz_score";
-    const needsProfile = mode === "profile_inference";
+    const profileFields = getProfileFields(selectedTest);
     const isDouble = getAssessmentTarget(selectedTest) === "double";
     const orderUserName = userName.trim() || "你";
     
@@ -811,8 +866,9 @@ export default function PhoneSimulator({
           testId: selectedTest.id,
           userName: orderUserName,
           gender,
-          birthDate: needsProfile ? birthDate : undefined,
-          birthTime: needsProfile ? birthTime : undefined,
+          birthDate: profileFields.includes("birthDate") ? birthDate : undefined,
+          birthTime: profileFields.includes("birthTime") && !birthTimeUnknown ? birthTime : undefined,
+          birthPlace: profileFields.includes("birthPlace") ? getBirthPlaceLabel() : undefined,
           partnerName: isDouble ? partnerName.trim() || undefined : undefined,
           partnerGender: isDouble ? partnerGender : undefined,
           partnerBirthDate: isDouble ? partnerBirthDate || undefined : undefined,
@@ -849,9 +905,14 @@ export default function PhoneSimulator({
 
     try {
       let response;
-      if (activePaymentOrder) {
+      let orderForPayment = activePaymentOrder;
+      if (!orderForPayment && pendingOrderPromiseRef.current) {
+        orderForPayment = await pendingOrderPromiseRef.current;
+      }
+
+      if (orderForPayment) {
         // Pay for existing pending order!
-        response = await fetch(`/api/orders/${activePaymentOrder.id}/pay`, {
+        response = await fetch(`/api/orders/${orderForPayment.id}/pay`, {
           method: "POST",
           headers: { "Content-Type": "application/json" }
         });
@@ -859,7 +920,7 @@ export default function PhoneSimulator({
         // Fallback or legacy direct calculation
         const mode = getAssessmentMode(selectedTest);
         const hasQuiz = mode === "quiz_score";
-        const needsProfile = mode === "profile_inference";
+        const profileFields = getProfileFields(selectedTest);
         const isDouble = getAssessmentTarget(selectedTest) === "double";
         const orderUserName = userName.trim() || "你";
 
@@ -870,8 +931,9 @@ export default function PhoneSimulator({
             testId: selectedTest.id,
             userName: orderUserName,
             gender,
-            birthDate: needsProfile ? birthDate : undefined,
-            birthTime: needsProfile ? birthTime : undefined,
+            birthDate: profileFields.includes("birthDate") ? birthDate : undefined,
+            birthTime: profileFields.includes("birthTime") && !birthTimeUnknown ? birthTime : undefined,
+            birthPlace: profileFields.includes("birthPlace") ? getBirthPlaceLabel() : undefined,
             partnerName: isDouble ? partnerName.trim() || undefined : undefined,
             partnerGender: isDouble ? partnerGender : undefined,
             partnerBirthDate: isDouble ? partnerBirthDate || undefined : undefined,
@@ -914,7 +976,6 @@ export default function PhoneSimulator({
 
     const mode = getAssessmentMode(selectedTest);
     const hasQuiz = mode === "quiz_score";
-    const needsProfile = mode === "profile_inference";
     const isDouble = getAssessmentTarget(selectedTest) === "double";
     const requiredFields = getProfileFields(selectedTest);
     if (requiredFields.includes("userName") && !userName.trim()) {
@@ -941,12 +1002,12 @@ export default function PhoneSimulator({
         })
         .join("\n");
     }
-    if (needsProfile) {
+    if (requiredFields.length > 0) {
       if (requiredFields.includes("birthDate") && !birthDate) {
         setErrorMsg("请填写出生日期，用于生成传统断语和后续 AI 报告。");
         return;
       }
-      if (requiredFields.includes("birthTime") && !birthTime) {
+      if (requiredFields.includes("birthTime") && !birthTimeUnknown && !birthTime) {
         setErrorMsg("请填写出生时间，用于更完整的资料推演。");
         return;
       }
@@ -971,16 +1032,15 @@ export default function PhoneSimulator({
     }
 
     setFormattedQuizAnswers(quizAnswersStr);
-    setPreviewGenerating(true);
-
-    // Call background pending order creation api
-    createPendingOrder(quizAnswersStr);
-
-    // Simulate 4s diagnostic loader to run through all 4 compilation steps, then unlock the mock premium lock and radar view!
-    setTimeout(() => {
-      setPreviewGenerating(false);
-      setShowPreviewReport(true);
-    }, 4000);
+    setPreviewGenerating(false);
+    const pendingOrderPromise = createPendingOrder(quizAnswersStr);
+    pendingOrderPromiseRef.current = pendingOrderPromise;
+    void pendingOrderPromise.finally(() => {
+      if (pendingOrderPromiseRef.current === pendingOrderPromise) {
+        pendingOrderPromiseRef.current = null;
+      }
+    });
+    setShowPreviewReport(true);
   };
 
   const getCategoryIcon = (category: string) => {
@@ -1132,7 +1192,6 @@ export default function PhoneSimulator({
     if (item.test) openConversionTarget(item.test, item.rule.targetSkuId);
   };
   const requestClosePaymentGate = () => {
-    if (isProcessingPayment) return;
     setShowPaymentGate(false);
   };
 
@@ -1363,6 +1422,9 @@ export default function PhoneSimulator({
                       <>
                         <p><span className="font-sans font-medium text-slate-900">生日：</span>{calculationResult.birthDate}</p>
                         <p><span className="font-sans font-medium text-slate-900">时间：</span>{calculationResult.birthTime || "未知"}</p>
+                        {calculationResult.birthPlace && (
+                          <p className="col-span-2"><span className="font-sans font-medium text-slate-900">地点：</span>{calculationResult.birthPlace}</p>
+                        )}
                       </>
                     ) : (
                       <p className="col-span-2"><span className="font-sans font-medium text-slate-900">测评形式：</span>互动答题 (免疫生日排盘)</p>
@@ -2530,7 +2592,7 @@ export default function PhoneSimulator({
                     )}
 
                     {/* 3. Birth details for profile-inference templates */}
-                    {activeProfileFields.some(field => field === "birthDate" || field === "birthTime") && (
+                    {activeProfileFields.some(field => field === "birthDate" || field === "birthTime" || field === "birthPlace") && (
                       <div className="grid grid-cols-2 gap-3 pt-1 animate-fade-in">
                         {activeProfileFields.includes("birthDate") && (
                           <div>
@@ -2546,14 +2608,77 @@ export default function PhoneSimulator({
                         )}
                         {activeProfileFields.includes("birthTime") && (
                           <div>
-                            <label className="block text-xs text-amber-200/80 mb-1.5 font-medium font-sans">具体出生时间</label>
+                            <div className="mb-1.5 flex items-center justify-between gap-2">
+                              <label className="block text-xs text-amber-200/80 font-medium font-sans">出生时间</label>
+                              <label className="flex items-center gap-1.5 text-[10px] font-medium text-slate-400">
+                                <input
+                                  type="checkbox"
+                                  checked={birthTimeUnknown}
+                                  onChange={(e) => {
+                                    setBirthTimeUnknown(e.target.checked);
+                                    setErrorMsg("");
+                                  }}
+                                  className="h-3 w-3 accent-amber-500"
+                                />
+                                我不知道
+                              </label>
+                            </div>
                             <input
                               type="time"
-                              required
+                              required={!birthTimeUnknown}
+                              disabled={birthTimeUnknown}
                               value={birthTime}
                               onChange={(e) => setBirthTime(e.target.value)}
-                              className="w-full bg-slate-950 border border-neutral-800 focus:border-amber-500 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all font-sans text-center"
+                              className="w-full bg-slate-950 border border-neutral-800 focus:border-amber-500 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all font-sans text-center disabled:cursor-not-allowed disabled:border-neutral-900 disabled:bg-slate-950/60 disabled:text-slate-600"
                             />
+                          </div>
+                        )}
+                        {activeProfileFields.includes("birthPlace") && (
+                          <div className="col-span-2">
+                            <label className="block text-xs text-amber-200/80 mb-1.5 font-medium font-sans">出生地点</label>
+                            <div className="grid grid-cols-3 gap-2">
+                              <select
+                                value={birthProvince}
+                                onChange={(e) => {
+                                  const nextProvince = CHINA_REGION_OPTIONS.find((item) => item.province === e.target.value) || CHINA_REGION_OPTIONS[0];
+                                  setBirthProvince(nextProvince.province);
+                                  setBirthCity(nextProvince.cities[0].city);
+                                  setBirthDistrict(nextProvince.cities[0].districts[0]);
+                                  setErrorMsg("");
+                                }}
+                                className="w-full bg-slate-950 border border-neutral-800 focus:border-amber-500 rounded-xl px-2 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all font-sans text-slate-200"
+                              >
+                                {CHINA_REGION_OPTIONS.map((item) => (
+                                  <option key={item.province} value={item.province}>{item.province}</option>
+                                ))}
+                              </select>
+                              <select
+                                value={birthCity}
+                                onChange={(e) => {
+                                  const nextCity = cityOptions.find((item) => item.city === e.target.value) || cityOptions[0];
+                                  setBirthCity(nextCity.city);
+                                  setBirthDistrict(nextCity.districts[0]);
+                                  setErrorMsg("");
+                                }}
+                                className="w-full bg-slate-950 border border-neutral-800 focus:border-amber-500 rounded-xl px-2 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all font-sans text-slate-200"
+                              >
+                                {cityOptions.map((item) => (
+                                  <option key={item.city} value={item.city}>{item.city}</option>
+                                ))}
+                              </select>
+                              <select
+                                value={birthDistrict}
+                                onChange={(e) => {
+                                  setBirthDistrict(e.target.value);
+                                  setErrorMsg("");
+                                }}
+                                className="w-full bg-slate-950 border border-neutral-800 focus:border-amber-500 rounded-xl px-2 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all font-sans text-slate-200"
+                              >
+                                {districtOptions.map((district) => (
+                                  <option key={district} value={district}>{district}</option>
+                                ))}
+                              </select>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -3517,31 +3642,16 @@ export default function PhoneSimulator({
               </div>
             </div>
 
-            {/* Fake state processor or action trigger */}
-            {isProcessingPayment ? (
-              <div className="bg-slate-950 p-4 rounded-xl border border-neutral-850 flex flex-col items-center justify-center text-center space-y-2 shrink-0">
-                <div className="w-5 h-5 rounded-full border-2 border-amber-500 border-t-transparent animate-spin" />
-                <p className="text-[10px] text-amber-400 font-mono animate-pulse">
-                  正在调起安全支付网关，请勿关闭窗口...
-                </p>
-              </div>
-            ) : (
-              <button 
-                onClick={() => {
-                  setIsProcessingPayment(true);
-                  // Simulate SSL handshake and callback in 1.8s
-                  setTimeout(() => {
-                    setIsProcessingPayment(false);
-                    setShowPaymentGate(false);
-                    triggerCalculatorAPI(formattedQuizAnswers);
-                  }, 1800);
-                }}
-                className="w-full bg-[#10B961] hover:bg-[#0ea554] text-slate-950 font-bold py-3.5 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-[0_4px_12px_rgba(16,185,97,0.25)] transition-all cursor-pointer shrink-0"
-              >
-                <CreditCard className="w-4 h-4" />
-                <span>立即安全支付 ￥{selectedSalePrice}</span>
-              </button>
-            )}
+            <button
+              onClick={() => {
+                setShowPaymentGate(false);
+                triggerCalculatorAPI(formattedQuizAnswers);
+              }}
+              className="w-full bg-[#10B961] hover:bg-[#0ea554] text-slate-950 font-bold py-3.5 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-[0_4px_12px_rgba(16,185,97,0.25)] transition-all cursor-pointer shrink-0"
+            >
+              <CreditCard className="w-4 h-4" />
+              <span>立即安全支付 ￥{selectedSalePrice}</span>
+            </button>
 
             <div className="flex items-center justify-center gap-2 text-[8.5px] text-slate-500 self-center shrink-0">
               <span>🛡️ 信托级数据安全加密</span>
