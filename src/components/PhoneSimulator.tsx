@@ -174,8 +174,21 @@ const QUIZ_QUESTIONS: Record<
 const getAssessmentMode = (test: TestItem): "quiz_score" | "profile_inference" =>
   test.assessmentMode || (test.category === "astrology" ? "profile_inference" : "quiz_score");
 
-const getAssessmentTarget = (test: TestItem): "single" | "double" =>
-  test.assessmentTarget || "single";
+const DOUBLE_RELATIONSHIP_THEME_IDS = new Set([
+  "love_test",
+  "crush_test",
+  "love_fit_test",
+  "marriage_test",
+  "communication_test",
+  "marriage_status_test"
+]);
+
+const getAssessmentTarget = (test: TestItem): "single" | "double" => {
+  if (test.assessmentTarget === "double" || (test.freeReportThemeId && DOUBLE_RELATIONSHIP_THEME_IDS.has(test.freeReportThemeId))) {
+    return "double";
+  }
+  return "single";
+};
 
 type ProfileField = NonNullable<TestItem["profileFields"]>[number];
 type ChinaRegionOption = {
@@ -184,6 +197,44 @@ type ChinaRegionOption = {
 };
 
 const DEFAULT_PROFILE_FIELDS: ProfileField[] = ["userName", "gender", "birthDate", "birthTime", "birthPlace", "question"];
+const DEFAULT_FREE_REPORT_TEMPLATE = `【{title}】
+根据你的答题 / 资料，系统初步识别到：{primaryLabel}。
+{primaryLabelCopy}
+
+免费预览显示：
+- {metric1Label}：{metric1Value}
+  {metric1Copy}
+- {metric2Label}：{metric2Value}
+  {metric2Copy}
+- {metric3Label}：{metric3Value}
+  {metric3Copy}
+
+一句话洞察：{oneLineInsight}
+初步建议：{lightAdvice}`;
+type FreeReportTheme = {
+  id: string;
+  name: string;
+  title: string;
+  primaryLabel: string;
+  primaryLabelCopy: string;
+  metrics: Array<{ key: string; label: string; value: string; copy: string }>;
+  oneLineInsight: string;
+  lightAdvice: string;
+};
+const FREE_REPORT_THEMES: FreeReportTheme[] = [
+  { id: "love_test", name: "恋爱测试", title: "你们的恋爱关系初判", primaryLabel: "稳定观察期", primaryLabelCopy: "你们之间有继续发展的基础，但关键要看双方回应是否稳定、关系边界是否清楚。", metrics: [{ key: "relationshipClarity", label: "关系清晰度", value: "中", copy: "彼此有好感或互动基础，但关系定义和下一步还需要确认。" }, { key: "investmentBalance", label: "双方投入平衡", value: "一方更主动", copy: "关系里可能存在一方推进更多、另一方回应较慢的情况。" }, { key: "relationshipStickingPoint", label: "当前恋爱卡点", value: "边界和节奏", copy: "真正影响关系质量的是边界是否清楚、推进节奏是否一致。" }], oneLineInsight: "这段关系的关键不是有没有心动，而是双方能不能稳定回应、清楚表达和一起推进。", lightAdvice: "先确认对方是否愿意持续投入，再决定主动推进还是放慢节奏。" },
+  { id: "crush_test", name: "暗恋测试", title: "你们的暗恋阶段初判", primaryLabel: "互有好感期", primaryLabelCopy: "对方不是完全无感，但关系还需要更多稳定互动来确认。", metrics: [{ key: "signalClarity", label: "对方回应清晰度", value: "高", copy: "对方的回应和主动性相对稳定。" }, { key: "interactionHeat", label: "互动热度", value: "升温", copy: "近期互动有推进迹象。" }, { key: "advanceRisk", label: "推进风险", value: "低", copy: "可以用轻度试探观察对方接球意愿。" }], oneLineInsight: "容易把单次回应放大成关系信号，需要看连续行为。", lightAdvice: "先用一次轻度邀约或话题延展测试对方是否愿意接住。" },
+  { id: "love_fit_test", name: "恋爱适配测试", title: "你们的关系适配初判", primaryLabel: "稳定互补型", primaryLabelCopy: "你们差异存在，但能形成支持和补位。", metrics: [{ key: "attractionSource", label: "吸引力来源", value: "表达吸引", copy: "容易被对方的回应、热情或存在感吸引。" }, { key: "mainConflict", label: "主要冲突点", value: "节奏错位", copy: "一方想推进，一方需要更多确认或空间。" }, { key: "longTermRisk", label: "长期适配风险", value: "高", copy: "长期需要处理明显的沟通或现实压力。" }], oneLineInsight: "容易形成一方追问、一方退开的循环。", lightAdvice: "先观察冲突后能否修复，比只看甜蜜时是否合拍更重要。" },
+  { id: "dating_test", name: "脱单测试", title: "你的脱单卡点初判", primaryLabel: "圈层过窄型", primaryLabelCopy: "你不是没有吸引力，而是可接触到合适对象的入口偏少。", metrics: [{ key: "dateResistance", label: "脱单阻力", value: "高", copy: "主要阻力来自入口、推进或防御模式。" }, { key: "mateClarity", label: "择偶清晰度", value: "高", copy: "你对适合什么人已有较清晰判断。" }, { key: "peachChannel", label: "桃花渠道", value: "熟人型", copy: "更适合从朋友介绍、熟人圈层和稳定互动开始。" }], oneLineInsight: "容易等待缘分自然发生，却没有给关系足够入口。", lightAdvice: "先扩一个稳定入口，再谈提高脱单概率。" },
+  { id: "marriage_test", name: "婚姻测试", title: "你们的婚姻结构初判", primaryLabel: "稳定共建型", primaryLabelCopy: "你们具备共同承担的基础，适合继续强化协作和沟通。", metrics: [{ key: "conflictFrequency", label: "冲突频率", value: "高", copy: "冲突或冷处理已经明显影响关系安全感。" }, { key: "emotionalAccount", label: "情绪账户", value: "充足", copy: "关系里仍有正向体验和互相支持。" }, { key: "cooperationDegree", label: "协作程度", value: "高", copy: "双方具备一起处理现实问题的基础。" }], oneLineInsight: "关系问题不一定是不爱了，而是协作规则没有跟上。", lightAdvice: "先把一个现实分工问题谈清楚，比反复讨论态度更有效。" },
+  { id: "communication_test", name: "沟通测试", title: "你的沟通模式初判", primaryLabel: "直接推进型", primaryLabelCopy: "你倾向快速把问题讲清楚，但容易让对方感到被推动。", metrics: [{ key: "expressionClarity", label: "表达清晰度", value: "高", copy: "你比较能把需求或事实讲清楚。" }, { key: "emotionalTrigger", label: "情绪触发点", value: "被误解", copy: "最容易被误解或否定触发。" }, { key: "coldWarRisk", label: "冷战风险", value: "高", copy: "冲突后容易拉开距离或长时间不沟通。" }], oneLineInsight: "真实需求容易被语气和防御动作盖住。", lightAdvice: "先说感受和需求，再说事实和方案。" },
+  { id: "marriage_status_test", name: "婚姻状态测试", title: "你们的婚姻温度初判", primaryLabel: "稳定经营期", primaryLabelCopy: "关系整体仍有温度，适合继续建设规则和亲密感。", metrics: [{ key: "relationshipTemperature", label: "关系温度", value: "高", copy: "关系里仍有较多支持、回应和正向体验。" }, { key: "repairPotential", label: "修复可能", value: "高", copy: "有可行动的修复入口。" }, { key: "riskLevel", label: "风险等级", value: "低", copy: "关系风险相对可控。" }], oneLineInsight: "真正的问题可能是长期需求没有被听见。", lightAdvice: "先把沟通目标从争输赢改成恢复可沟通。" },
+  { id: "annual_growth_test", name: "年度发展测试", title: "你的年度发展主线初判", primaryLabel: "蓄力期", primaryLabelCopy: "今年更适合打基础、补短板和稳定节奏。", metrics: [{ key: "annualMainline", label: "年度主线", value: "事业推进", copy: "今年更适合围绕工作、能力和资源做规划。" }, { key: "careerPace", label: "事业节奏", value: "上升", copy: "适合争取机会、提升曝光和主动推进。" }, { key: "relationshipPace", label: "感情节奏", value: "升温", copy: "适合增加真实互动和关系投入。" }], oneLineInsight: "今年不是单纯更努力，而是先把精力放到正确主线上。", lightAdvice: "先选一个年度主线，再安排事业、感情和自我提升的顺序。" },
+  { id: "personality_test", name: "性格测试", title: "你的核心性格初判", primaryLabel: "推进领导型", primaryLabelCopy: "你擅长把想法变成行动，但需要避免过度紧绷。", metrics: [{ key: "strengthTrait", label: "优势特质", value: "外向值", copy: "连接、表达和带动氛围。" }, { key: "shortTrait", label: "短板特质", value: "外向值", copy: "表达和主动连接可能偏少。" }, { key: "growthDirection", label: "发展方向", value: "表达连接", copy: "练习更清楚地表达需求和想法。" }], oneLineInsight: "你的优势用对了是天赋，用过头就会变成消耗。", lightAdvice: "先识别一个最常被过度使用的优势，再练习给它加边界。" },
+  { id: "emotional_overthinking", name: "情绪内耗", title: "你的内耗来源初判", primaryLabel: "焦虑预演型", primaryLabelCopy: "你容易提前想很多可能性，用预演风险换安全感。", metrics: [{ key: "anxietyLevel", label: "焦虑强度", value: "高", copy: "不确定感和反复担心比较明显。" }, { key: "pressureSource", label: "压力来源", value: "关系", copy: "主要消耗来自关系回应、边界或亲密互动。" }, { key: "recoveryAbility", label: "恢复能力", value: "高", copy: "你仍有较好的自我调节和恢复入口。" }], oneLineInsight: "容易用反复预演风险来换取短暂安全感。", lightAdvice: "先把今天必须处理的事和可以延后的担心分开。" },
+  { id: "career_planning", name: "职业规划", title: "你的职业方向初判", primaryLabel: "兴趣探索型", primaryLabelCopy: "你需要先找到真正愿意持续投入的方向。", metrics: [{ key: "careerStrength", label: "职业优势", value: "兴趣值", copy: "好奇心、内容偏好和探索动力。" }, { key: "stabilityNeed", label: "稳定需求", value: "高", copy: "你需要较强安全感，不适合贸然高风险转向。" }, { key: "growthPotential", label: "成长潜力", value: "高", copy: "适合主动争取平台、项目或新赛道。" }], oneLineInsight: "当前重点不是追热门，而是找到能力、兴趣和风险承受的交集。", lightAdvice: "先做一次低成本验证，再决定是否转行或投入副业。" },
+  { id: "relationship_review", name: "感情复盘测试", title: "你的感情复盘初判", primaryLabel: "需求错位型", primaryLabelCopy: "你们的分歧核心可能不是谁不够好，而是彼此要的关系不同。", metrics: [{ key: "attachmentDegree", label: "放不下程度", value: "高", copy: "这段关系仍明显牵动你的情绪和判断。" }, { key: "responsibilityPoint", label: "关系责任点", value: "沟通", copy: "很多问题卡在没有被有效讲清。" }, { key: "repairSpace", label: "修复空间", value: "高", copy: "仍有沟通和修复入口，但需要方法。" }], oneLineInsight: "你走不出来，可能是因为这段关系还有未被解释的问题。", lightAdvice: "先把事实、感受和期待分开写下来，不要急着判断谁对谁错。" }
+];
 const CHINA_REGION_OPTIONS: ChinaRegionOption[] = [
   { province: "北京市", cities: [{ city: "北京市", districts: ["东城区", "西城区", "朝阳区", "海淀区", "丰台区"] }] },
   { province: "上海市", cities: [{ city: "上海市", districts: ["黄浦区", "徐汇区", "静安区", "浦东新区", "闵行区"] }] },
@@ -209,6 +260,18 @@ const getProfileFields = (test: TestItem): ProfileField[] => {
     ? [...fields, "birthPlace"]
     : fields;
 };
+
+const getDefaultFreeReportThemeId = (test: TestItem) => {
+  if (test.category === "career") return "career_planning";
+  if (test.category === "personality" || test.category === "mbti" || test.category === "sbti") return "personality_test";
+  if (test.category === "astrology") return "annual_growth_test";
+  return "love_test";
+};
+
+const getFreeReportTheme = (test: TestItem) =>
+  FREE_REPORT_THEMES.find((theme) => theme.id === test.freeReportThemeId)
+  || FREE_REPORT_THEMES.find((theme) => theme.id === getDefaultFreeReportThemeId(test))
+  || FREE_REPORT_THEMES[0];
 
 const getQuizQuestions = (test: TestItem) => QUIZ_QUESTIONS[test.category] || [];
 
@@ -849,6 +912,42 @@ export default function PhoneSimulator({
     return `传统断语预览：基于${profileText}，先由确定性传统规则给出基础判断，再由 AI 在不否定该判断的前提下补充完整报告。`;
   };
 
+  const renderTemplate = (template: string, variables: Record<string, string>) =>
+    Object.entries(variables).reduce((text, [key, value]) => text.replace(new RegExp(`\\{${key}\\}`, "g"), value), template);
+
+  const buildFreeReportPayload = (answersSummary: string) => {
+    if (!selectedTest) {
+      return {
+        freeReportThemeId: "",
+        freeReportTemplateVersion: "v1",
+        freeReportText: ""
+      };
+    }
+    const theme = getFreeReportTheme(selectedTest);
+    const metrics = theme.metrics;
+    const freeReportText = renderTemplate(DEFAULT_FREE_REPORT_TEMPLATE, {
+      title: theme.title,
+      primaryLabel: theme.primaryLabel,
+      primaryLabelCopy: theme.primaryLabelCopy,
+      metric1Label: metrics[0]?.label || "指标1",
+      metric1Value: metrics[0]?.value || "-",
+      metric1Copy: metrics[0]?.copy || "",
+      metric2Label: metrics[1]?.label || "指标2",
+      metric2Value: metrics[1]?.value || "-",
+      metric2Copy: metrics[1]?.copy || "",
+      metric3Label: metrics[2]?.label || "指标3",
+      metric3Value: metrics[2]?.value || "-",
+      metric3Copy: metrics[2]?.copy || "",
+      oneLineInsight: theme.oneLineInsight,
+      lightAdvice: theme.lightAdvice
+    });
+    return {
+      freeReportThemeId: theme.id,
+      freeReportTemplateVersion: "v1",
+      freeReportText
+    };
+  };
+
   // Create a pending unpaid order on the backend
   const createPendingOrder = async (answersSummary: string): Promise<CalculationOrder | null> => {
     if (!selectedTest) return null;
@@ -857,6 +956,7 @@ export default function PhoneSimulator({
     const profileFields = getProfileFields(selectedTest);
     const isDouble = getAssessmentTarget(selectedTest) === "double";
     const orderUserName = userName.trim() || "你";
+    const freeReportPayload = buildFreeReportPayload(answersSummary);
     
     try {
       const response = await fetch("/api/orders", {
@@ -876,6 +976,7 @@ export default function PhoneSimulator({
           quizAnswers: hasQuiz ? answersSummary : undefined,
           scoreSummary: hasQuiz ? buildScoreSummary(answersSummary) : undefined,
           traditionalSummary: buildTraditionalSummary(),
+          ...freeReportPayload,
           question: question.trim() ? question.trim() : undefined,
           paymentMethod: selectedPayMethod,
           price: selectedSalePrice
@@ -923,6 +1024,7 @@ export default function PhoneSimulator({
         const profileFields = getProfileFields(selectedTest);
         const isDouble = getAssessmentTarget(selectedTest) === "double";
         const orderUserName = userName.trim() || "你";
+        const freeReportPayload = buildFreeReportPayload(cachedAnswers);
 
         response = await fetch("/api/orders/calculate", {
           method: "POST",
@@ -941,6 +1043,7 @@ export default function PhoneSimulator({
             quizAnswers: hasQuiz ? cachedAnswers : undefined,
             scoreSummary: hasQuiz ? buildScoreSummary(cachedAnswers) : undefined,
             traditionalSummary: buildTraditionalSummary(),
+            ...freeReportPayload,
             question: question.trim() ? question.trim() : undefined,
             paymentMethod: selectedPayMethod,
             price: selectedSalePrice
@@ -1583,9 +1686,9 @@ export default function PhoneSimulator({
                     </div>
 
                     <div className="p-3 bg-slate-950/40 rounded-lg border border-neutral-850/50 space-y-3">
-                      <p className="text-[9px] text-slate-300 leading-relaxed font-serif">
-                        根据参测者 <span className="text-amber-300 font-sans font-bold">{userName || "测试用户"}</span> 填报的数据，系统智能抓取到您潜在的本源心智图谱：您易在人际互动中展现出<span className="text-emerald-400">“表面沉稳、极速共情”</span>的特质。思维层次分明且具有极强的主动纠偏功能，以下为您初步评测的多维指标系数：
-                      </p>
+                      <div className="whitespace-pre-line text-[9px] text-slate-300 leading-relaxed font-serif">
+                        {buildFreeReportPayload(formattedQuizAnswers).freeReportText}
+                      </div>
 
                       {/* Interactive indicator bars */}
                       <div className="space-y-2 text-slate-400">

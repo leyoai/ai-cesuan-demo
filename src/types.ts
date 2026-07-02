@@ -24,6 +24,7 @@ export interface TestItem {
   tagColor: string;
   isActive: boolean;
   questionBankIds?: string[];
+  freeReportThemeId?: string;
   promptSourceTestId?: string;
   promptTemplateId?: string;
   promptTemplate: string;
@@ -62,6 +63,9 @@ export interface CalculationOrder {
   quizAnswers?: string; // summary of answered questions for quiz-based assessments
   scoreSummary?: string; // structured scores for quiz-based assessments
   traditionalSummary?: string; // deterministic traditional summary before AI enrichment
+  freeReportThemeId?: string;
+  freeReportTemplateVersion?: string;
+  freeReportText?: string; // algorithm-generated free preview text shown before payment
   question: string;
   price: number;
   paymentMethod?: "wechat" | "alipay";

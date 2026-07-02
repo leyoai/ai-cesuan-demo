@@ -127,6 +127,28 @@ type MarketingTab = "landing" | "data" | "accounts";
 
 const REPORT_TEMPLATE_STORAGE_KEY = "admin_report_templates_v1";
 const REPORT_TEMPLATE_DISABLED_STORAGE_KEY = "admin_report_template_disabled_v1";
+type FreeReportThemeOption = {
+  id: string;
+  name: string;
+  title: string;
+  category: TestItem["category"];
+  target: NonNullable<TestItem["assessmentTarget"]>;
+};
+
+const FREE_REPORT_THEME_OPTIONS: FreeReportThemeOption[] = [
+  { id: "love_test", name: "恋爱测试", title: "你们的恋爱关系初判", category: "emotion", target: "double" },
+  { id: "crush_test", name: "暗恋测试", title: "你们的暗恋阶段初判", category: "emotion", target: "double" },
+  { id: "love_fit_test", name: "恋爱适配测试", title: "你们的关系适配初判", category: "emotion", target: "double" },
+  { id: "dating_test", name: "脱单测试", title: "你的脱单卡点初判", category: "emotion", target: "single" },
+  { id: "marriage_test", name: "婚姻测试", title: "你们的婚姻结构初判", category: "emotion", target: "double" },
+  { id: "communication_test", name: "沟通测试", title: "你的沟通模式初判", category: "emotion", target: "double" },
+  { id: "marriage_status_test", name: "婚姻状态测试", title: "你们的婚姻温度初判", category: "emotion", target: "double" },
+  { id: "annual_growth_test", name: "年度发展测试", title: "你的年度发展主线初判", category: "astrology", target: "single" },
+  { id: "personality_test", name: "性格测试", title: "你的核心性格初判", category: "personality", target: "single" },
+  { id: "emotional_overthinking", name: "情绪内耗", title: "你的内耗来源初判", category: "emotion", target: "single" },
+  { id: "career_planning", name: "职业规划", title: "你的职业方向初判", category: "career", target: "single" },
+  { id: "relationship_review", name: "感情复盘测试", title: "你的感情复盘初判", category: "emotion", target: "single" }
+];
 
 const getMediaPlatformKey = (platform: string) => (platform === "快手" ? "kuaishou" : "juliang");
 
@@ -266,6 +288,7 @@ export default function AdminDashboard({
   const [itemButtonText, setItemButtonText] = useState("马上测试");
   const [itemThemeColor, setItemThemeColor] = useState("#f59e0b");
   const [itemPromptRefId, setItemPromptRefId] = useState("");
+  const [itemFreeReportThemeId, setItemFreeReportThemeId] = useState("love_test");
   const [templateNameFilter, setTemplateNameFilter] = useState("");
   const [templateSkuFilter, setTemplateSkuFilter] = useState("all");
   const [templateCategoryFilter, setTemplateCategoryFilter] = useState<"all" | TestItem["category"]>("all");
@@ -445,6 +468,21 @@ export default function AdminDashboard({
   const getPromptTemplateName = (test: TestItem) => {
     const templateId = test.promptTemplateId || `tpl-${test.id}`;
     return promptTemplates.find((template) => template.id === templateId)?.name || `${test.name}默认报告模板`;
+  };
+  const getDefaultFreeReportThemeId = (category: TestItem["category"]) => {
+    if (category === "career") return "career_planning";
+    if (category === "personality" || category === "mbti" || category === "sbti") return "personality_test";
+    if (category === "astrology") return "annual_growth_test";
+    return "love_test";
+  };
+  const getFreeReportThemeOption = (themeId: string) =>
+    FREE_REPORT_THEME_OPTIONS.find((item) => item.id === themeId);
+  const getFreeReportThemeTarget = (themeId: string) =>
+    getFreeReportThemeOption(themeId)?.target || "single";
+  const getFreeReportThemeLabel = (test: TestItem) => {
+    const themeId = test.freeReportThemeId || getDefaultFreeReportThemeId(test.category);
+    const theme = getFreeReportThemeOption(themeId);
+    return theme ? `${theme.name}｜${theme.title}` : "未关联免费报告模板";
   };
   const getSkuById = (skuId?: string) => productSkus.find((sku) => sku.id === skuId);
   const getTestBySkuId = (skuId?: string) => {
@@ -873,18 +911,6 @@ export default function AdminDashboard({
     setActiveMenu("questionBank");
   };
 
-  const reportTemplateVariables = [
-    { token: "{User_Result}", label: "测评结果", sample: "题库计分结果：已完成24道题，核心倾向为高共情、高洞察、偏内省型。" },
-    { token: "{Basic_Info}", label: "用户背景", sample: "姓名：林小满；性别：女；出生日期：1996-08-18；出生时间：09:30；咨询问题：我适合怎样的发展方向？" },
-    { token: "{User_Name}", label: "姓名/称呼", sample: "林小满" },
-    { token: "{Gender}", label: "性别", sample: "女" },
-    { token: "{Birth_Date}", label: "出生日期", sample: "1996-08-18" },
-    { token: "{Birth_Time}", label: "出生时间", sample: "09:30" },
-    { token: "{Question}", label: "咨询问题", sample: "我适合怎样的发展方向？" },
-    { token: "{Partner_Info}", label: "伴侣背景", sample: "伴侣姓名：陈一；伴侣性别：男；伴侣出生日期：1994-03-12；伴侣出生时间：21:15" },
-    { token: "{Partner_Name}", label: "伴侣姓名", sample: "陈一" }
-  ];
-
   const openCreateReportTemplate = () => {
     setEditingReportTemplateId(null);
     setReportTemplateName("");
@@ -897,10 +923,6 @@ export default function AdminDashboard({
     setReportTemplateName(template.name);
     setReportTemplateContent(template.content);
     setShowReportTemplateModal(true);
-  };
-
-  const insertReportTemplateVariable = (token: string) => {
-    setReportTemplateContent((current) => `${current}${current && !current.endsWith("\n") ? "\n" : ""}${token}`);
   };
 
   const toggleReportTemplateStatus = (templateId: string) => {
@@ -1056,6 +1078,7 @@ export default function AdminDashboard({
     setItemButtonText("马上测试");
     setItemThemeColor("#f59e0b");
     setItemPromptRefId(promptTemplates[0]?.id || "");
+    setItemFreeReportThemeId(getDefaultFreeReportThemeId("mbti"));
     setShowItemModal(true);
   };
 
@@ -1065,7 +1088,8 @@ export default function AdminDashboard({
     setItemName(test.name);
     setItemCategory(test.category);
     setItemAssessmentMode(test.assessmentMode || getCategoryAssessmentMode(test.category));
-    setItemTarget(test.assessmentTarget || "single");
+    const nextFreeReportThemeId = test.freeReportThemeId || getDefaultFreeReportThemeId(test.category);
+    setItemTarget(test.assessmentTarget === "double" || getFreeReportThemeTarget(nextFreeReportThemeId) === "double" ? "double" : "single");
     const nextAssessmentMode = test.assessmentMode || getCategoryAssessmentMode(test.category);
     const nextProfileFields = test.profileFields || (nextAssessmentMode === "profile_inference" ? defaultProfileFields : defaultQuizProfileFields);
     setItemProfileFields(test.category === "astrology" && nextAssessmentMode === "profile_inference" && !nextProfileFields.includes("birthPlace") ? [...nextProfileFields, "birthPlace"] : nextProfileFields);
@@ -1086,6 +1110,7 @@ export default function AdminDashboard({
     setItemButtonText(test.detailButtonText || "马上测试");
     setItemThemeColor(test.detailThemeColor || "#f59e0b");
     setItemPromptRefId(test.promptTemplateId || `tpl-${test.id}`);
+    setItemFreeReportThemeId(nextFreeReportThemeId);
     setShowItemModal(true);
   };
 
@@ -1111,6 +1136,10 @@ export default function AdminDashboard({
       showAdminAlert("请输入免责声明。");
       return;
     }
+    if (!FREE_REPORT_THEME_OPTIONS.some((theme) => theme.id === itemFreeReportThemeId)) {
+      showAdminAlert("请选择免费报告模板。");
+      return;
+    }
     const existing = tests.find((test) => test.id === editingItemId);
     const safeId = editingItemId || generateEightDigitId(tests.map((test) => test.id));
     const referencedPrompt = promptTemplates.find((template) => template.id === itemPromptRefId);
@@ -1120,7 +1149,7 @@ export default function AdminDashboard({
       name: itemName.trim(),
       category: itemCategory,
       assessmentMode: resolvedMode,
-      assessmentTarget: resolvedMode === "quiz_score" ? "single" : itemTarget,
+      assessmentTarget: itemTarget,
       profileFields: itemProfileFields,
       description: itemDescription.trim() || existing?.description || "后台新增测算商品。",
       detailHeroImage: itemHeroImage.trim(),
@@ -1135,6 +1164,7 @@ export default function AdminDashboard({
       tagColor: existing?.tagColor || "amber",
       isActive: existing?.isActive ?? true,
       questionBankIds: resolvedMode === "quiz_score" ? itemQuestionBankIds : [],
+      freeReportThemeId: itemFreeReportThemeId,
       promptSourceTestId: referencedPrompt?.id,
       promptTemplateId: referencedPrompt?.id || `tpl-${safeId}`,
       promptTemplate,
@@ -3306,8 +3336,11 @@ export default function AdminDashboard({
                       onChange={(event) => {
                         const nextCategory = event.target.value as TestItem["category"];
                         const nextMode = getCategoryAssessmentMode(nextCategory);
+                        const nextThemeId = getDefaultFreeReportThemeId(nextCategory);
                         setItemCategory(nextCategory);
                         setItemAssessmentMode(nextMode);
+                        setItemFreeReportThemeId(nextThemeId);
+                        setItemTarget(getFreeReportThemeTarget(nextThemeId));
                         setItemProfileFields(nextMode === "profile_inference" ? defaultProfileFields : defaultQuizProfileFields);
                         setItemQuestionBankIds([]);
                         setItemQuestionSearch("");
@@ -3348,10 +3381,11 @@ export default function AdminDashboard({
                   </label>
                   <label className="space-y-1 text-[10px] font-bold text-slate-500">
                     测算对象
-                    <select disabled={resolvedMode === "quiz_score"} value={resolvedMode === "quiz_score" ? "single" : itemTarget} onChange={(event) => setItemTarget(event.target.value as "single" | "double")} className="w-full rounded-xl border border-neutral-800 bg-slate-950 px-3 py-2 text-xs text-slate-200 outline-none focus:border-[#1D9E75] disabled:text-slate-600">
-                      <option value="single">单人测算</option>
-                      <option value="double">双人测算</option>
+                    <select value={itemTarget} onChange={(event) => setItemTarget(event.target.value as "single" | "double")} className="w-full rounded-xl border border-neutral-800 bg-slate-950 px-3 py-2 text-xs text-slate-200 outline-none focus:border-[#1D9E75]">
+                      <option value="single">单人对象</option>
+                      <option value="double">双人关系</option>
                     </select>
+                    <span className="block text-[9px] font-medium text-slate-600">双人测算表示测你和 TA 的关系，仍由当前用户单人作答。</span>
                   </label>
                 </div>
                 <div className="space-y-2">
@@ -3575,11 +3609,35 @@ export default function AdminDashboard({
 
               {itemFormStep === "details" && <section className="rounded-2xl border border-neutral-800 bg-slate-950/60 p-4 lg:col-span-2">
                 <div className="space-y-3">
-                <div className="text-xs font-bold text-[#1D9E75]">关联AI报告模板</div>
+                <div className="text-xs font-bold text-[#1D9E75]">关联付费报告模板</div>
                 <select value={itemPromptRefId} onChange={(event) => setItemPromptRefId(event.target.value)} className="w-full rounded-xl border border-neutral-800 bg-slate-950 px-3 py-2 text-xs text-slate-200 outline-none focus:border-[#1D9E75]">
                   {promptTemplates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
                 </select>
-                <p className="text-[10px] text-slate-600">报告生成时将使用选中的AI报告模板。</p>
+                <p className="text-[10px] text-slate-600">付费报告生成时将使用选中的付费报告模板；可在提示词里引用 {"{Free_Report}"} 承接免费结论。</p>
+                </div>
+              </section>}
+
+              {itemFormStep === "details" && <section className="rounded-2xl border border-neutral-800 bg-slate-950/60 p-4 lg:col-span-2">
+                <div className="space-y-3">
+                <div>
+                  <div className="text-xs font-bold text-[#1D9E75]">关联免费报告模板</div>
+                  <p className="mt-1 text-[10px] text-slate-600">免费报告展示模板固定，这里只选择 12 个主题中的一套规则和文案。</p>
+                </div>
+                <select
+                  value={itemFreeReportThemeId}
+                  onChange={(event) => {
+                    const nextThemeId = event.target.value;
+                    setItemFreeReportThemeId(nextThemeId);
+                    setItemTarget(getFreeReportThemeTarget(nextThemeId));
+                  }}
+                  className="w-full rounded-xl border border-neutral-800 bg-slate-950 px-3 py-2 text-xs text-slate-200 outline-none focus:border-[#1D9E75]"
+                >
+                  {FREE_REPORT_THEME_OPTIONS.map((theme) => (
+                    <option key={theme.id} value={theme.id}>
+                      {theme.name}｜{theme.title}
+                    </option>
+                  ))}
+                </select>
                 </div>
               </section>}
             </div>
@@ -3707,10 +3765,10 @@ export default function AdminDashboard({
               </button>
             </div>
             <div className="overflow-x-auto">
-              <table className="min-w-[1280px] w-full text-left text-xs text-slate-300">
+              <table className="min-w-[1460px] w-full text-left text-xs text-slate-300">
                 <thead className="border-b border-neutral-800 bg-[#090d16]/30 text-[10px] text-slate-500">
                   <tr>
-                    {["模板ID", "模板名称", "关联商品", "测算分类", "测算模式", "测算对象", "题目数", "提示词模板", "创建时间", "操作"].map((head) => (
+                    {["模板ID", "模板名称", "关联商品", "测算分类", "测算模式", "测算对象", "题目数", "付费报告模板", "免费报告模板", "创建时间", "操作"].map((head) => (
                       <th key={head} className="p-3 whitespace-nowrap">{head}</th>
                     ))}
                   </tr>
@@ -3731,10 +3789,13 @@ export default function AdminDashboard({
                         </td>
                         <td className="p-3">{categoryLabels[test.category]}</td>
                         <td className="p-3">{test.assessmentMode === "profile_inference" ? "资料推演" : "题库计分"}</td>
-                        <td className="p-3">{test.assessmentTarget === "double" ? "双人测算" : "单人测算"}</td>
+                        <td className="p-3">{test.assessmentTarget === "double" ? "双人关系" : "单人对象"}</td>
                         <td className="p-3 font-mono">{test.questionBankIds?.length || 0}</td>
                         <td className="p-3">
                           <div className="max-w-[220px] truncate text-slate-400" title={getPromptTemplateName(test)}>{getPromptTemplateName(test)}</div>
+                        </td>
+                        <td className="p-3">
+                          <div className="max-w-[220px] truncate text-slate-400" title={getFreeReportThemeLabel(test)}>{getFreeReportThemeLabel(test)}</div>
                         </td>
                         <td className="p-3 text-slate-500">{test.createdAt || "-"}</td>
                         <td className="p-3">
@@ -3760,7 +3821,7 @@ export default function AdminDashboard({
                   })}
                   {filteredContentTemplates.length === 0 && (
                     <tr>
-                      <td colSpan={10} className="p-8 text-center text-xs text-slate-500">暂无匹配内容模板</td>
+                      <td colSpan={11} className="p-8 text-center text-xs text-slate-500">暂无匹配内容模板</td>
                     </tr>
                   )}
                 </tbody>
@@ -4972,59 +5033,38 @@ export default function AdminDashboard({
       </div>
       {showReportTemplateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#020617] p-4">
-          <div className="flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-neutral-800 bg-neutral-950 shadow-2xl">
+          <div className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-neutral-800 bg-neutral-950 shadow-2xl">
             <div className="flex items-center justify-between border-b border-neutral-800 p-5">
               <div>
                 <h3 className="text-sm font-bold text-slate-100">{editingReportTemplateId ? "编辑报告模板" : "新增报告模板"}</h3>
-                <p className="mt-1 text-[10px] text-slate-500">变量可点击插入提示词正文。</p>
+                <p className="mt-1 text-[10px] text-slate-500">填写报告生成话术。</p>
               </div>
               <button type="button" onClick={() => { setShowReportTemplateModal(false); setEditingReportTemplateId(null); }} className="rounded-xl p-2 text-slate-500 hover:bg-neutral-900 hover:text-slate-200" aria-label="关闭报告模板弹窗">
                 <X className="h-4 w-4" />
               </button>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto p-5">
-              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
-                <div className="space-y-4">
-                  <label className="flex flex-col gap-1 text-[10px] font-bold text-slate-500">
-                    模板名称
-                    <input
-                      maxLength={30}
-                      value={reportTemplateName}
-                      onChange={(event) => setReportTemplateName(event.target.value)}
-                      placeholder="字数不超过30个字"
-                      className="h-10 rounded-xl border border-neutral-800 bg-[#030713] px-3 text-xs text-slate-200 outline-none focus:border-[#1D9E75]"
-                    />
-                    <span className="text-right text-[10px] font-medium text-slate-600">{reportTemplateName.length}/30</span>
-                  </label>
-                  <label className="flex flex-col gap-1 text-[10px] font-bold text-slate-500">
-                    提示词正文
-                    <textarea
-                      value={reportTemplateContent}
-                      onChange={(event) => setReportTemplateContent(event.target.value)}
-                      placeholder="请输入报告生成话术，可点击右侧变量插入占位符。"
-                      className="min-h-[190px] resize-y rounded-xl border border-neutral-800 bg-[#030713] px-3 py-3 text-xs leading-6 text-slate-200 outline-none focus:border-[#1D9E75]"
-                    />
-                  </label>
-                </div>
-                <div className="space-y-3 rounded-2xl border border-neutral-800 bg-slate-950/70 p-4">
-                  <div>
-                    <div className="text-xs font-bold text-[#1D9E75]">变量展示</div>
-                    <p className="mt-1 text-[10px] leading-5 text-slate-500">点击变量可直接加入提示词正文中。</p>
-                  </div>
-                  <div className="space-y-2">
-                    {reportTemplateVariables.map((variable) => (
-                      <button
-                        key={variable.token}
-                        type="button"
-                        onClick={() => insertReportTemplateVariable(variable.token)}
-                        className="flex w-full items-center justify-between gap-2 rounded-xl border border-neutral-800 bg-[#030713] px-3 py-2 text-left hover:border-[#1D9E75]/60"
-                      >
-                        <span className="font-mono text-[10px] text-[#9CE6CF]">{variable.token}</span>
-                        <span className="shrink-0 text-[10px] text-slate-500">{variable.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
+              <div className="space-y-4">
+                <label className="flex flex-col gap-1 text-[10px] font-bold text-slate-500">
+                  模板名称
+                  <input
+                    maxLength={30}
+                    value={reportTemplateName}
+                    onChange={(event) => setReportTemplateName(event.target.value)}
+                    placeholder="字数不超过30个字"
+                    className="h-10 rounded-xl border border-neutral-800 bg-[#030713] px-3 text-xs text-slate-200 outline-none focus:border-[#1D9E75]"
+                  />
+                  <span className="text-right text-[10px] font-medium text-slate-600">{reportTemplateName.length}/30</span>
+                </label>
+                <label className="flex flex-col gap-1 text-[10px] font-bold text-slate-500">
+                  提示词正文
+                  <textarea
+                    value={reportTemplateContent}
+                    onChange={(event) => setReportTemplateContent(event.target.value)}
+                    placeholder="请输入报告生成话术。"
+                    className="min-h-[280px] resize-y rounded-xl border border-neutral-800 bg-[#030713] px-3 py-3 text-xs leading-6 text-slate-200 outline-none focus:border-[#1D9E75]"
+                  />
+                </label>
               </div>
             </div>
             <div className="flex shrink-0 justify-end gap-2 border-t border-neutral-800 p-4">
